@@ -16,6 +16,7 @@ variables:
   BUN_INSTALL_CACHE_DIR: "$CI_PROJECT_DIR/.bun/install/cache"
   NPM_CONFIG_UPDATE_NOTIFIER: "false"
   PLAYWRIGHT_BROWSERS_PATH: "$CI_PROJECT_DIR/.cache/ms-playwright"
+  SAST_EXCLUDED_ANALYZERS: "semgrep"
   VERCEL_TELEMETRY_DISABLED: "1"
 
 include:

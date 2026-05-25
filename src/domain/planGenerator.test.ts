@@ -58,6 +58,14 @@ describe("deadline food domain logic", () => {
     expect(plan.totalCostPence).toBe(expectedTotal);
   });
 
+  test("can generate lunch and dinner entries when lunches are selected", () => {
+    const plan = generatePlan({ ...canonicalConstraints, mealSlots: ["lunch", "dinner"], budgetPence: 4500 }, "mixed", seededMeals);
+
+    expect(plan.days).toHaveLength(10);
+    expect(plan.days.some(day => day.mealSlot === "lunch")).toBe(true);
+    expect(plan.days.some(day => day.dayId === "monday-lunch")).toBe(true);
+  });
+
   test("rescue substitution updates only the chosen day", () => {
     const plan = generatePlan(canonicalConstraints, "mixed", seededMeals);
     const proposal = findRescueOptions(plan, "tuesday", seededMeals)[0];

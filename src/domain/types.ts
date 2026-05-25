@@ -1,5 +1,7 @@
 export type MealType = "prep_base" | "remix" | "quick_cook" | "fallback";
 
+export type MealSlot = "lunch" | "dinner";
+
 export type KitchenAccess = "full" | "limited" | "none";
 
 export type PlanStrategy = "prep-once" | "mixed" | "no-cook-rescue";
@@ -11,17 +13,29 @@ export type PlanningConstraints = {
   maxPrepMinutes: number;
   kitchenAccess: KitchenAccess;
   dietaryTags: string[];
+  mealSlots: MealSlot[];
   preferredLocation?: string;
+};
+
+export type RecipeDetails = {
+  summary: string;
+  ingredients: string[];
+  steps: string[];
+  prepNotes?: string;
+  storage?: string;
+  whyItFits: string;
 };
 
 export type MealOption = {
   id: string;
   name: string;
   mealType: MealType;
+  mealSlots: MealSlot[];
   pricePence: number;
   prepMinutes: number;
   dietaryTags: string[];
   suitabilityTags: string[];
+  recipe: RecipeDetails;
   location?: string;
   provider?: string;
   derivesFromPrepBaseId?: string;
@@ -30,6 +44,8 @@ export type MealOption = {
 
 export type PlannedMeal = {
   dayId: string;
+  calendarDayId: string;
+  mealSlot: MealSlot;
   dateLabel: string;
   contextTags: string[];
   meal: MealOption;

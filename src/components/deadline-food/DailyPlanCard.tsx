@@ -1,4 +1,4 @@
-import { Clock, MapPin, RefreshCw } from "lucide-react";
+import { BookOpen, Clock, MapPin, RefreshCw } from "lucide-react";
 import { Link } from "react-router";
 
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,14 @@ export function DailyPlanCard({ plannedMeal }: { plannedMeal: PlannedMeal }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <h3 className="font-semibold text-slate-950">{plannedMeal.meal.name}</h3>
+          <Link
+            to={`/recipes/${plannedMeal.meal.id}`}
+            className="inline-flex items-center gap-2 font-semibold text-slate-950 underline-offset-4 hover:underline"
+            aria-label={`View recipe for ${plannedMeal.meal.name}`}
+          >
+            {plannedMeal.meal.name}
+            <BookOpen className="size-4" />
+          </Link>
           {plannedMeal.meal.provider && (
             <p className="mt-1 flex items-center gap-2 text-sm text-slate-600">
               <MapPin className="size-4" />

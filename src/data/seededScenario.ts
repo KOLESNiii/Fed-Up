@@ -8,6 +8,7 @@ export const canonicalConstraints: PlanningConstraints = {
   maxPrepMinutes: 20,
   kitchenAccess: "full",
   dietaryTags: [],
+  mealSlots: ["dinner"],
   preferredLocation: "library",
 };
 

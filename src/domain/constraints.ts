@@ -1,6 +1,7 @@
-import type { MealOption, PlanningConstraints, ValidationResult } from "./types";
+import type { MealOption, MealSlot, PlanningConstraints, ValidationResult } from "./types";
 
 export const planningWeekDays = ["monday", "tuesday", "wednesday", "thursday", "friday"] as const;
+export const mealSlots: MealSlot[] = ["lunch", "dinner"];
 
 const dayLabels: Record<string, string> = {
   monday: "Monday",
@@ -25,6 +26,10 @@ export function validateConstraints(input: PlanningConstraints): ValidationResul
     errors.push("Select at least one deadline-heavy day.");
   }
 
+  if (input.mealSlots.length === 0) {
+    errors.push("Choose at least one meal to plan.");
+  }
+
   if (!["full", "limited", "none"].includes(input.kitchenAccess)) {
     errors.push("Choose a kitchen access option.");
   }
@@ -38,6 +43,14 @@ export function getPlanningDayIds(): string[] {
 
 export function formatDayLabel(dayId: string): string {
   return dayLabels[dayId] ?? dayId;
+}
+
+export function formatMealSlotLabel(slot: MealSlot): string {
+  return slot === "lunch" ? "Lunch" : "Dinner";
+}
+
+export function formatPlanItemLabel(dayId: string, slot: MealSlot): string {
+  return `${formatDayLabel(dayId)} ${formatMealSlotLabel(slot).toLowerCase()}`;
 }
 
 export function getContextTags(dayId: string, constraints: PlanningConstraints): string[] {
@@ -70,6 +83,16 @@ export function canCook(constraints: PlanningConstraints): boolean {
 
 export function canPrepareBase(constraints: PlanningConstraints, meal: MealOption): boolean {
   return constraints.kitchenAccess !== "none" && meal.prepMinutes <= constraints.maxPrepMinutes;
+}
+
+export function getMealSlotsForConstraints(constraints: PlanningConstraints): MealSlot[] {
+  return constraints.mealSlots.length > 0 ? constraints.mealSlots : ["dinner"];
+}
+
+export function createPlannedMealId(dayId: string, slot: MealSlot, constraints: PlanningConstraints): string {
+  const slots = getMealSlotsForConstraints(constraints);
+
+  return slots.length === 1 && slot === "dinner" ? dayId : `${dayId}-${slot}`;
 }
 
 export function sortByPreferredFallback(

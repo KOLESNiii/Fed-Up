@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatDayLabel, planningWeekDays } from "@/domain/constraints";
-import type { KitchenAccess, PlanningConstraints } from "@/domain/types";
+import { formatDayLabel, mealSlots as availableMealSlots, planningWeekDays } from "@/domain/constraints";
+import type { KitchenAccess, MealSlot, PlanningConstraints } from "@/domain/types";
 import { useDeadlineMode } from "@/state/DeadlineModeProvider";
 
 function toggleValue(values: string[], value: string): string[] {
@@ -32,6 +32,7 @@ export function DeadlineSetupPage() {
   );
   const [kitchenAccess, setKitchenAccess] = useState<KitchenAccess>(() => initialConstraints?.kitchenAccess ?? "full");
   const [dietaryTag, setDietaryTag] = useState(() => initialConstraints?.dietaryTags[0] ?? "none");
+  const [selectedMealSlots, setSelectedMealSlots] = useState<MealSlot[]>(() => initialConstraints?.mealSlots ?? ["dinner"]);
   const [preferredLocation, setPreferredLocation] = useState(() => initialConstraints?.preferredLocation ?? "library");
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -44,6 +45,7 @@ export function DeadlineSetupPage() {
       maxPrepMinutes,
       kitchenAccess,
       dietaryTags: dietaryTag === "none" ? [] : [dietaryTag],
+      mealSlots: selectedMealSlots,
       preferredLocation,
     };
 
@@ -172,6 +174,23 @@ export function DeadlineSetupPage() {
                 </Select>
               </div>
             </div>
+
+            <fieldset className="space-y-3">
+              <legend className="text-sm font-semibold text-slate-950">Meals to plan</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {availableMealSlots.map(slot => (
+                  <label key={slot} className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm">
+                    <input
+                      checked={selectedMealSlots.includes(slot)}
+                      type="checkbox"
+                      onChange={() => setSelectedMealSlots(current => toggleValue(current, slot) as MealSlot[])}
+                    />
+                    {slot === "lunch" ? "Lunches" : "Dinners"}
+                  </label>
+                ))}
+              </div>
+              <p className="text-sm text-slate-500">Add lunches when you want the plan to cover campus daytime meals too.</p>
+            </fieldset>
 
             {state.validationErrors.length > 0 && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">

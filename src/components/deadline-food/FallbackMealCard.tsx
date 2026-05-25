@@ -1,4 +1,5 @@
-import { Clock, MapPin } from "lucide-react";
+import { BookOpen, Clock, MapPin } from "lucide-react";
+import { Link } from "react-router";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { MealOption } from "@/domain/types";
@@ -9,7 +10,16 @@ export function FallbackMealCard({ meal }: { meal: MealOption }) {
   return (
     <Card className="rounded-lg border-slate-200 bg-white">
       <CardHeader className="gap-2">
-        <CardTitle className="text-lg">{meal.name}</CardTitle>
+        <CardTitle className="text-lg">
+          <Link
+            to={`/recipes/${meal.id}`}
+            className="inline-flex items-center gap-2 underline-offset-4 hover:underline"
+            aria-label={`View recipe for ${meal.name}`}
+          >
+            {meal.name}
+            <BookOpen className="size-4" />
+          </Link>
+        </CardTitle>
         <p className="flex items-center gap-2 text-sm text-slate-600">
           <MapPin className="size-4" />
           {meal.provider} near {meal.location}

@@ -5,6 +5,7 @@ import { FallbackBrowsePage } from "@/pages/FallbackBrowsePage";
 import { DeadlineSetupPage } from "@/pages/DeadlineSetupPage";
 import { LandingPage } from "@/pages/LandingPage";
 import { PlanDashboardPage } from "@/pages/PlanDashboardPage";
+import { RecipePage } from "@/pages/RecipePage";
 import { RescuePage } from "@/pages/RescuePage";
 import { StrategySelectionPage } from "@/pages/StrategySelectionPage";
 import { DeadlineModeProvider, useDeadlineMode } from "@/state/DeadlineModeProvider";
@@ -44,6 +45,7 @@ function AppRoutes() {
         <Route path="/deadline-mode/strategies" element={<StrategySelectionPage />} />
         <Route path="/deadline-mode/plan" element={<PlanDashboardPage />} />
         <Route path="/deadline-mode/rescue/:dayId" element={<RescuePage />} />
+        <Route path="/recipes/:mealId" element={<RecipePage />} />
         <Route path="/fallbacks" element={<FallbackBrowsePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

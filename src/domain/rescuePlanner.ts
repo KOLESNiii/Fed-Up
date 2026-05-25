@@ -10,7 +10,10 @@ export function findRescueOptions(plan: WeeklyPlan, dayId: string, meals: MealOp
 
   const totalWithoutOriginal = plan.totalCostPence - plannedMeal.meal.pricePence;
   const compatibleFallbacks = meals.filter(
-    meal => meal.mealType === "fallback" && matchesDietaryTags(meal, plan.constraints.dietaryTags),
+    meal =>
+      meal.mealType === "fallback" &&
+      meal.mealSlots.includes(plannedMeal.mealSlot) &&
+      matchesDietaryTags(meal, plan.constraints.dietaryTags),
   );
 
   return sortByPreferredFallback(compatibleFallbacks, plan.constraints, totalWithoutOriginal).map(replacement => {

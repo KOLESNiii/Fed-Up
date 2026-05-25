@@ -1,21 +1,42 @@
 import {
   canCook,
   canPrepareBase,
+  createPlannedMealId,
   formatDayLabel,
+  formatMealSlotLabel,
+  formatPlanItemLabel,
   getContextTags,
+  getMealSlotsForConstraints,
   getPlanningDayIds,
   matchesDietaryTags,
   sortByPreferredFallback,
 } from "./constraints";
-import type { MealOption, PlannedMeal, PlanningConstraints, PlanStrategy, WeeklyPlan } from "./types";
+import type { MealOption, MealSlot, PlannedMeal, PlanningConstraints, PlanStrategy, WeeklyPlan } from "./types";
 
 function cheapest(meals: MealOption[]): MealOption | undefined {
   return [...meals].sort((a, b) => a.pricePence - b.pricePence || a.prepMinutes - b.prepMinutes)[0];
 }
 
-function compatibleMeals(meals: MealOption[], constraints: PlanningConstraints, mealType?: MealOption["mealType"]) {
+type PlanItem = {
+  calendarDayId: string;
+  mealSlot: MealSlot;
+};
+
+function getPlanItems(constraints: PlanningConstraints): PlanItem[] {
+  const slots = getMealSlotsForConstraints(constraints);
+
+  return getPlanningDayIds().flatMap(calendarDayId => slots.map(mealSlot => ({ calendarDayId, mealSlot })));
+}
+
+function compatibleMeals(
+  meals: MealOption[],
+  constraints: PlanningConstraints,
+  mealType?: MealOption["mealType"],
+  mealSlot?: MealSlot,
+) {
   return meals.filter(meal => {
     if (mealType !== undefined && meal.mealType !== mealType) return false;
+    if (mealSlot !== undefined && !meal.mealSlots.includes(mealSlot)) return false;
     if (!matchesDietaryTags(meal, constraints.dietaryTags)) return false;
     if (meal.mealType !== "fallback" && meal.prepMinutes > constraints.maxPrepMinutes) return false;
     if (meal.mealType !== "fallback" && constraints.kitchenAccess === "none") return false;
@@ -28,96 +49,112 @@ function pickFallback(
   constraints: PlanningConstraints,
   projectedTotalWithoutCandidate: number,
   usedIds: Set<string>,
+  mealSlot: MealSlot,
 ): MealOption {
   const fallbacks = sortByPreferredFallback(
-    compatibleMeals(meals, constraints, "fallback").filter(meal => !usedIds.has(meal.id)),
+    compatibleMeals(meals, constraints, "fallback", mealSlot).filter(meal => !usedIds.has(meal.id)),
     constraints,
     projectedTotalWithoutCandidate,
   );
 
-  return fallbacks[0] ?? cheapest(compatibleMeals(meals, constraints, "fallback")) ?? meals[0]!;
+  return fallbacks[0] ?? cheapest(compatibleMeals(meals, constraints, "fallback", mealSlot)) ?? meals[0]!;
 }
 
-function pickRemix(meals: MealOption[], constraints: PlanningConstraints, base: MealOption | undefined, index: number) {
-  const remixes = compatibleMeals(meals, constraints, "remix").filter(
+function pickRemix(
+  meals: MealOption[],
+  constraints: PlanningConstraints,
+  base: MealOption | undefined,
+  index: number,
+  mealSlot: MealSlot,
+) {
+  const remixes = compatibleMeals(meals, constraints, "remix", mealSlot).filter(
     meal => base === undefined || meal.derivesFromPrepBaseId === base.id,
   );
 
-  return remixes[index % Math.max(remixes.length, 1)] ?? cheapest(compatibleMeals(meals, constraints, "quick_cook"));
+  return remixes[index % Math.max(remixes.length, 1)] ?? cheapest(compatibleMeals(meals, constraints, "quick_cook", mealSlot));
 }
 
-function pickQuickCook(meals: MealOption[], constraints: PlanningConstraints) {
-  return cheapest(compatibleMeals(meals, constraints, "quick_cook"));
+function pickQuickCook(meals: MealOption[], constraints: PlanningConstraints, mealSlot: MealSlot) {
+  return cheapest(compatibleMeals(meals, constraints, "quick_cook", mealSlot));
 }
 
-function buildPlanMeal(dayId: string, meal: MealOption, constraints: PlanningConstraints): PlannedMeal {
+function buildPlanMeal(item: PlanItem, meal: MealOption, constraints: PlanningConstraints): PlannedMeal {
   return {
-    dayId,
-    dateLabel: formatDayLabel(dayId),
-    contextTags: getContextTags(dayId, constraints),
+    dayId: createPlannedMealId(item.calendarDayId, item.mealSlot, constraints),
+    calendarDayId: item.calendarDayId,
+    mealSlot: item.mealSlot,
+    dateLabel:
+      getMealSlotsForConstraints(constraints).length === 1
+        ? formatDayLabel(item.calendarDayId)
+        : formatPlanItemLabel(item.calendarDayId, item.mealSlot),
+    contextTags: [formatMealSlotLabel(item.mealSlot).toLowerCase(), ...getContextTags(item.calendarDayId, constraints)],
     meal,
     wasRescued: false,
   };
 }
 
 function buildPrepOncePlan(constraints: PlanningConstraints, meals: MealOption[]): PlannedMeal[] {
-  const days = getPlanningDayIds();
+  const items = getPlanItems(constraints);
   const base = cheapest(compatibleMeals(meals, constraints, "prep_base").filter(meal => canPrepareBase(constraints, meal)));
   const usedFallbacks = new Set<string>();
+  let baseUsed = false;
 
-  return days.map((dayId, index) => {
+  return items.map((item, index) => {
     const meal =
-      index === 0 && base !== undefined
+      !baseUsed && base !== undefined && (item.mealSlot === "dinner" || index === 0)
         ? base
-        : pickRemix(meals, constraints, base, index - 1) ??
-          pickQuickCook(meals, constraints) ??
-          pickFallback(meals, constraints, 0, usedFallbacks);
+        : pickRemix(meals, constraints, base, index - 1, item.mealSlot) ??
+          pickQuickCook(meals, constraints, item.mealSlot) ??
+          pickFallback(meals, constraints, 0, usedFallbacks, item.mealSlot);
 
+    if (meal.id === base?.id) baseUsed = true;
     if (meal.mealType === "fallback") usedFallbacks.add(meal.id);
-    return buildPlanMeal(dayId, meal, constraints);
+    return buildPlanMeal(item, meal, constraints);
   });
 }
 
 function buildMixedPlan(constraints: PlanningConstraints, meals: MealOption[]): PlannedMeal[] {
-  const days = getPlanningDayIds();
+  const items = getPlanItems(constraints);
   const base = cheapest(compatibleMeals(meals, constraints, "prep_base").filter(meal => canPrepareBase(constraints, meal)));
   const usedFallbacks = new Set<string>();
   let runningTotal = 0;
   let remixIndex = 0;
+  let baseUsed = false;
 
-  return days.map((dayId, index) => {
+  return items.map((item, index) => {
     let meal: MealOption | undefined;
 
-    if (index === 0 && base !== undefined && canCook(constraints)) {
+    if (!baseUsed && base !== undefined && canCook(constraints) && (item.mealSlot === "dinner" || index === 0)) {
       meal = base;
-    } else if (constraints.lateCampusDays.includes(dayId)) {
-      meal = pickFallback(meals, constraints, runningTotal, usedFallbacks);
+      baseUsed = true;
+    } else if (constraints.lateCampusDays.includes(item.calendarDayId) && item.mealSlot === "dinner") {
+      meal = pickFallback(meals, constraints, runningTotal, usedFallbacks, item.mealSlot);
     } else {
-      meal = pickRemix(meals, constraints, base, remixIndex) ?? pickQuickCook(meals, constraints);
+      meal = pickRemix(meals, constraints, base, remixIndex, item.mealSlot) ?? pickQuickCook(meals, constraints, item.mealSlot);
       remixIndex += 1;
     }
 
-    meal ??= pickFallback(meals, constraints, runningTotal, usedFallbacks);
+    meal ??= pickFallback(meals, constraints, runningTotal, usedFallbacks, item.mealSlot);
 
     if (meal.mealType === "fallback") usedFallbacks.add(meal.id);
     runningTotal += meal.pricePence;
 
-    return buildPlanMeal(dayId, meal, constraints);
+    return buildPlanMeal(item, meal, constraints);
   });
 }
 
 function buildNoCookPlan(constraints: PlanningConstraints, meals: MealOption[]): PlannedMeal[] {
-  const days = getPlanningDayIds();
+  const items = getPlanItems(constraints);
   const usedFallbacks = new Set<string>();
   let runningTotal = 0;
 
-  return days.map(dayId => {
-    const meal = pickFallback(meals, constraints, runningTotal, usedFallbacks);
+  return items.map(item => {
+    const meal = pickFallback(meals, constraints, runningTotal, usedFallbacks, item.mealSlot);
 
     usedFallbacks.add(meal.id);
     runningTotal += meal.pricePence;
 
-    return buildPlanMeal(dayId, meal, constraints);
+    return buildPlanMeal(item, meal, constraints);
   });
 }
 

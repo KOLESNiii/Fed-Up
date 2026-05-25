@@ -1,6 +1,7 @@
 stages:
   - dependencies
   - checks
+  - prototype
   - build
   - security
   - deploy
@@ -35,6 +36,7 @@ include:
         - bun.lock
     paths:
       - .bun/install/cache/
+      - .cache/ms-playwright/
   before_script:
     - |
       if ! command -v bun >/dev/null 2>&1; then
@@ -108,10 +110,17 @@ unit_tests:
   script:
     - bun run test:unit
 
-e2e_tests:
+domain_tests:
   extends: .bun_job
   stage: checks
   script:
+    - bun run test:domain
+
+e2e_tests:
+  extends: .bun_job
+  stage: prototype
+  script:
+    - ./node_modules/.bin/playwright install chromium
     - bun run test:e2e
   artifacts:
     when: always

@@ -117,6 +117,9 @@ audit:
   script:
     - bun run audit
 
+dependency_scanning:
+  stage: security
+
 sast:
   stage: security
   allow_failure: false

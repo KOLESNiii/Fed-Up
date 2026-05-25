@@ -74,6 +74,22 @@ merge_policy:
       fi
       echo "Merge policy passed: staging may be merged into master."
 
+merge_policy:
+  image: alpine:3.20
+  stage: dependencies
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"'
+    - when: never
+  script:
+    - |
+      if [ "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" != "staging" ]; then
+        echo "Only the staging branch may be merged into master."
+        echo "Source branch: $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
+        echo "Target branch: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+        exit 1
+      fi
+      echo "Merge policy passed: staging may be merged into master."
+
 lint:
   extends: .bun_job
   stage: checks

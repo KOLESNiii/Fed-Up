@@ -80,10 +80,10 @@ export function PlanScreen({
           <Heart size={16} /> Find alternatives
         </AppButton>
       </div>
-      <div className="grid gap-5 lg:grid-cols-[1fr_310px]">
-        <div className="overflow-x-auto">
-          <div className="min-w-[920px] overflow-hidden rounded-lg border border-stone-200 bg-white">
-            <div className="grid grid-cols-[150px_repeat(3,minmax(220px,1fr))] border-b border-stone-200 bg-stone-50 text-sm font-semibold text-stone-600">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="space-y-4">
+          <div className="hidden overflow-hidden rounded-lg border border-stone-200 bg-white md:block">
+            <div className="grid grid-cols-[minmax(100px,0.55fr)_repeat(3,minmax(0,1fr))] border-b border-stone-200 bg-stone-50 text-sm font-semibold text-stone-600">
               <div className="px-4 py-3">Day</div>
               {mealSlots.map((slot) => (
                 <div key={slot} className="border-l border-stone-200 px-4 py-3">
@@ -92,7 +92,7 @@ export function PlanScreen({
               ))}
             </div>
             {plan.map((entry) => (
-              <div key={entry.day} className="grid grid-cols-[150px_repeat(3,minmax(220px,1fr))] border-b border-stone-200 last:border-b-0">
+              <div key={entry.day} className="grid grid-cols-[minmax(100px,0.55fr)_repeat(3,minmax(0,1fr))] border-b border-stone-200 last:border-b-0">
                 <div className="bg-stone-50 px-4 py-4">
                   <p className="font-bold">{entry.day}</p>
                   <p className="mt-1 text-xs leading-5 text-stone-500">{entry.context}</p>
@@ -103,7 +103,7 @@ export function PlanScreen({
 
                   return (
                     <div key={slot} className="border-l border-stone-200 p-3">
-                      <div className="flex h-full min-h-[190px] flex-col justify-between rounded-lg bg-stone-50 p-4">
+                      <div className="flex h-full min-h-[178px] flex-col justify-between rounded-lg bg-stone-50 p-3">
                         <button
                           type="button"
                           onClick={() => onSelectMeal(meal.id)}
@@ -115,10 +115,10 @@ export function PlanScreen({
                               {meal.type === "fallback" ? "Fallback" : meal.type === "cook" ? "Cook" : "Remix"}
                             </Badge>
                           </div>
-                          <p className="mt-3 text-base font-semibold">
+                          <p className="mt-3 text-sm font-semibold leading-5">
                             {meal.image} {meal.name}
                           </p>
-                          <div className="mt-3 flex flex-wrap gap-3 text-sm text-stone-600">
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs text-stone-600">
                             <span className="flex items-center gap-1">
                               <Clock3 size={14} /> {meal.time} mins
                             </span>
@@ -126,7 +126,7 @@ export function PlanScreen({
                           </div>
                           <p className="mt-2 line-clamp-2 text-sm text-stone-500">{meal.source}</p>
                         </button>
-                        <AppButton variant="danger" className="mt-4 w-full justify-center" onClick={() => setRescueChoice({ day: entry.day, slot })}>
+                        <AppButton variant="danger" className="mt-4 w-full justify-center px-3 py-2 text-xs" onClick={() => setRescueChoice({ day: entry.day, slot })}>
                           <RefreshCcw size={15} /> Choose a different option
                         </AppButton>
                       </div>
@@ -134,6 +134,40 @@ export function PlanScreen({
                   );
                 })}
               </div>
+            ))}
+          </div>
+
+          <div className="space-y-4 md:hidden">
+            {plan.map((entry) => (
+              <Card key={entry.day} className="gap-0 rounded-lg border-stone-200 bg-white p-4">
+                <div className="mb-4">
+                  <p className="font-bold">{entry.day}</p>
+                  <p className="mt-1 text-sm text-stone-500">{entry.context}</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {mealSlots.map((slot) => {
+                    const planMeal = entry.meals.find((meal) => meal.slot === slot);
+                    const meal = getMealById(planMeal?.mealId ?? "m1", customRecipes);
+
+                    return (
+                      <div key={slot} className="rounded-lg bg-stone-50 p-3">
+                        <p className="text-xs font-semibold uppercase text-stone-500">{slotLabels[slot]}</p>
+                        <button type="button" onClick={() => onSelectMeal(meal.id)} className="mt-2 w-full text-left">
+                          <p className="font-semibold leading-5">
+                            {meal.image} {meal.name}
+                          </p>
+                          <p className="mt-1 text-sm text-stone-500">
+                            {meal.time} mins - {money(meal.price)}
+                          </p>
+                        </button>
+                        <AppButton variant="danger" className="mt-3 w-full justify-center px-3 py-2 text-xs" onClick={() => setRescueChoice({ day: entry.day, slot })}>
+                          <RefreshCcw size={15} /> Choose a different option
+                        </AppButton>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
             ))}
           </div>
         </div>

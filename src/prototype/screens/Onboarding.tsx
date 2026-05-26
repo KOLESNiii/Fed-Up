@@ -254,7 +254,14 @@ export function Onboarding({
                 onAdd={(value) => addSelection(prefs.likes, value, (next) => setPrefs({ ...prefs, likes: next }))}
                 addPlaceholder="Add anything else you like"
               />
-              <ChoiceGroup title="Ingredients I dislike" options={dislikes} selected={prefs.dislikes} onToggle={(value) => toggle(prefs.dislikes, value, (next) => setPrefs({ ...prefs, dislikes: next }))} />
+              <ChoiceGroup
+                title="Ingredients I dislike"
+                options={dislikes}
+                selected={prefs.dislikes}
+                onToggle={(value) => toggle(prefs.dislikes, value, (next) => setPrefs({ ...prefs, dislikes: next }))}
+                onAdd={(value) => addSelection(prefs.dislikes, value, (next) => setPrefs({ ...prefs, dislikes: next }))}
+                addPlaceholder="Add an ingredient you dislike"
+              />
             </div>
             <div className="mt-8 flex justify-between">
               <AppButton variant="ghost" onClick={() => setStep(0)}>

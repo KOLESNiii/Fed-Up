@@ -97,7 +97,14 @@ export function SettingsScreen({
             onAdd={(value) => addSelection(prefs.likes, value, (next) => setPrefs({ ...prefs, likes: next }))}
             addPlaceholder="Add anything else you like"
           />
-          <ChoiceGroup title="Ingredients I dislike" options={dislikes} selected={prefs.dislikes} onToggle={(value) => toggle(prefs.dislikes, value, (next) => setPrefs({ ...prefs, dislikes: next }))} />
+          <ChoiceGroup
+            title="Ingredients I dislike"
+            options={dislikes}
+            selected={prefs.dislikes}
+            onToggle={(value) => toggle(prefs.dislikes, value, (next) => setPrefs({ ...prefs, dislikes: next }))}
+            onAdd={(value) => addSelection(prefs.dislikes, value, (next) => setPrefs({ ...prefs, dislikes: next }))}
+            addPlaceholder="Add an ingredient you dislike"
+          />
         </div>
         <div className="mt-6 rounded-lg bg-stone-50 p-4">
           <p className="font-semibold">Calendar connection</p>

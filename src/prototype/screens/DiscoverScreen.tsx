@@ -18,7 +18,7 @@ export function DiscoverScreen({
   customRecipes: Meal[];
   setPlan: (plan: PlanEntry[]) => void;
   plan: PlanEntry[];
-  onSelectMeal?: (mealId: string) => void;
+  onSelectMeal: (mealId: string) => void;
 }) {
   const initialQueue = [...customRecipes, ...seedMeals.filter((meal) => !customRecipes.some((customMeal) => customMeal.id === meal.id))];
   const [queue, setQueue] = useState(initialQueue);
@@ -82,7 +82,7 @@ export function DiscoverScreen({
                     <ThumbsUp />
                   </button>
                 </div>
-                <AppButton variant="secondary" className="mt-3 w-full justify-center" onClick={() => onSelectMeal?.(current.id)}>
+                <AppButton variant="secondary" className="mt-3 w-full justify-center" onClick={() => onSelectMeal(current.id)}>
                   View recipe
                 </AppButton>
               </div>
@@ -117,7 +117,7 @@ export function DiscoverScreen({
                   <AppButton variant="secondary" onClick={() => addToPlan(meal)}>
                     Use
                   </AppButton>
-                  <AppButton variant="ghost" onClick={() => onSelectMeal?.(meal.id)}>
+                  <AppButton variant="ghost" onClick={() => onSelectMeal(meal.id)}>
                     View
                   </AppButton>
                 </div>

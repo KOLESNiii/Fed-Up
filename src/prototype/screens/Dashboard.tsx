@@ -17,7 +17,7 @@ export function Dashboard({
   plan: PlanEntry[];
   customRecipes: Meal[];
   setScreen: (screen: Screen) => void;
-  onSelectMeal?: (mealId: string) => void;
+  onSelectMeal: (mealId: string) => void;
 }) {
   const nextCook = plan
     .flatMap((entry) =>
@@ -98,7 +98,7 @@ export function Dashboard({
                           <button
                             key={planMeal.slot}
                             type="button"
-                            onClick={() => onSelectMeal?.(planMeal.mealId)}
+                            onClick={() => onSelectMeal(planMeal.mealId)}
                             className="min-w-0 rounded-lg bg-white px-3 py-2 text-left transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-700"
                           >
                             <p className="text-[11px] font-semibold uppercase text-stone-500">{planMeal.slot}</p>

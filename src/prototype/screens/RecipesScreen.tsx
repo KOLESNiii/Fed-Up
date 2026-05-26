@@ -13,7 +13,7 @@ export function RecipesScreen({
 }: {
   customRecipes: Meal[];
   setCustomRecipes: (recipes: Meal[]) => void;
-  onSelectMeal?: (mealId: string) => void;
+  onSelectMeal: (mealId: string) => void;
 }) {
   const [form, setForm] = useState({ name: "", minutes: 10, price: 2.5, ingredients: "", tags: "" });
 
@@ -88,7 +88,7 @@ export function RecipesScreen({
               </div>
             ) : (
               customRecipes.map((recipe) => (
-                <button key={recipe.id} type="button" onClick={() => onSelectMeal?.(recipe.id)} className="w-full rounded-lg bg-stone-50 p-4 text-left transition hover:bg-emerald-50">
+                <button key={recipe.id} type="button" onClick={() => onSelectMeal(recipe.id)} className="w-full rounded-lg bg-stone-50 p-4 text-left transition hover:bg-emerald-50">
                   <div className="flex justify-between gap-3">
                     <p className="font-semibold">
                       {recipe.image} {recipe.name}

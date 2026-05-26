@@ -82,29 +82,6 @@ lint:
   stage: checks
   script:
     - bun run lint
-
-typecheck:
-  extends: .bun_job
-  stage: checks
-  script:
-    - bun run typecheck
-
-unit_tests:
-  extends: .bun_job
-  stage: checks
-  script:
-    - bun run test:unit
-
-domain_tests:
-  extends: .bun_job
-  stage: checks
-  script:
-    - bun run test:domain
-
-firebase_functions:
-  extends: .bun_job
-  stage: checks
-  script:
     - |
       if [ ! -e functions/node_modules ]; then
         if [ -d "$APP_DEPS_DIR/functions/node_modules" ] &&
@@ -119,9 +96,40 @@ firebase_functions:
           npm --prefix functions ci
         fi
       fi
-    - bun run firebase:data
     - cd functions && bun run lint
-    - cd functions && bun run build
+
+typecheck:
+  extends: .bun_job
+  stage: checks
+  script:
+    - bun run typecheck
+    - |
+      if [ ! -e functions/node_modules ]; then
+        if [ -d "$APP_DEPS_DIR/functions/node_modules" ] &&
+          [ -f "$APP_DEPS_DIR/functions/package.json" ] &&
+          [ -f "$APP_DEPS_DIR/functions/package-lock.json" ] &&
+          cmp -s "$APP_DEPS_DIR/functions/package.json" functions/package.json &&
+          cmp -s "$APP_DEPS_DIR/functions/package-lock.json" functions/package-lock.json; then
+          ln -s "$APP_DEPS_DIR/functions/node_modules" functions/node_modules
+          echo "Using Firebase function dependencies baked into $APP_CI_IMAGE"
+        else
+          echo "Baked Firebase function dependencies missing or stale; running npm ci"
+          npm --prefix functions ci
+        fi
+      fi
+    - cd functions && bun run typecheck
+
+unit_tests:
+  extends: .bun_job
+  stage: checks
+  script:
+    - bun run test:unit
+
+domain_tests:
+  extends: .bun_job
+  stage: checks
+  script:
+    - bun run test:domain
 
 e2e_tests:
   extends: .bun_job
@@ -144,6 +152,21 @@ build:
   stage: build
   script:
     - bun run build
+    - |
+      if [ ! -e functions/node_modules ]; then
+        if [ -d "$APP_DEPS_DIR/functions/node_modules" ] &&
+          [ -f "$APP_DEPS_DIR/functions/package.json" ] &&
+          [ -f "$APP_DEPS_DIR/functions/package-lock.json" ] &&
+          cmp -s "$APP_DEPS_DIR/functions/package.json" functions/package.json &&
+          cmp -s "$APP_DEPS_DIR/functions/package-lock.json" functions/package-lock.json; then
+          ln -s "$APP_DEPS_DIR/functions/node_modules" functions/node_modules
+          echo "Using Firebase function dependencies baked into $APP_CI_IMAGE"
+        else
+          echo "Baked Firebase function dependencies missing or stale; running npm ci"
+          npm --prefix functions ci
+        fi
+      fi
+    - cd functions && bun run build
   artifacts:
     expire_in: 1 week
     paths:

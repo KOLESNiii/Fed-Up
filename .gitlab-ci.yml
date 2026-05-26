@@ -4,6 +4,7 @@ stages:
   - prototype
   - build
   - security
+  - backend_deploy
   - deploy
 
 workflow:
@@ -76,22 +77,6 @@ merge_policy:
       fi
       echo "Merge policy passed: staging may be merged into master."
 
-merge_policy:
-  image: alpine:3.20
-  stage: dependencies
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"'
-    - when: never
-  script:
-    - |
-      if [ "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" != "staging" ]; then
-        echo "Only the staging branch may be merged into master."
-        echo "Source branch: $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
-        echo "Target branch: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
-        exit 1
-      fi
-      echo "Merge policy passed: staging may be merged into master."
-
 lint:
   extends: .bun_job
   stage: checks
@@ -115,6 +100,28 @@ domain_tests:
   stage: checks
   script:
     - bun run test:domain
+
+firebase_functions:
+  extends: .bun_job
+  stage: checks
+  script:
+    - |
+      if [ ! -e functions/node_modules ]; then
+        if [ -d "$APP_DEPS_DIR/functions/node_modules" ] &&
+          [ -f "$APP_DEPS_DIR/functions/package.json" ] &&
+          [ -f "$APP_DEPS_DIR/functions/package-lock.json" ] &&
+          cmp -s "$APP_DEPS_DIR/functions/package.json" functions/package.json &&
+          cmp -s "$APP_DEPS_DIR/functions/package-lock.json" functions/package-lock.json; then
+          ln -s "$APP_DEPS_DIR/functions/node_modules" functions/node_modules
+          echo "Using Firebase function dependencies baked into $APP_CI_IMAGE"
+        else
+          echo "Baked Firebase function dependencies missing or stale; running npm ci"
+          npm --prefix functions ci
+        fi
+      fi
+    - bun run firebase:data
+    - cd functions && bun run lint
+    - cd functions && bun run build
 
 e2e_tests:
   extends: .bun_job
@@ -182,6 +189,48 @@ secret_detection:
     - ./node_modules/.bin/vercel build $VERCEL_BUILD_FLAGS --token="$VERCEL_TOKEN"
     - DEPLOYMENT_URL="$(./node_modules/.bin/vercel deploy --prebuilt $VERCEL_DEPLOY_FLAGS --token="$VERCEL_TOKEN")"
     - 'echo "Vercel deployment URL: $DEPLOYMENT_URL"'
+
+.deploy_firebase:
+  extends: .bun_job
+  stage: backend_deploy
+  script:
+    - test -n "$FIREBASE_PROJECT_ID"
+    - test -n "$FIREBASE_SERVICE_ACCOUNT_KEY_B64"
+    - |
+      if [ ! -e functions/node_modules ]; then
+        if [ -d "$APP_DEPS_DIR/functions/node_modules" ] &&
+          [ -f "$APP_DEPS_DIR/functions/package.json" ] &&
+          [ -f "$APP_DEPS_DIR/functions/package-lock.json" ] &&
+          cmp -s "$APP_DEPS_DIR/functions/package.json" functions/package.json &&
+          cmp -s "$APP_DEPS_DIR/functions/package-lock.json" functions/package-lock.json; then
+          ln -s "$APP_DEPS_DIR/functions/node_modules" functions/node_modules
+          echo "Using Firebase function dependencies baked into $APP_CI_IMAGE"
+        else
+          echo "Baked Firebase function dependencies missing or stale; running npm ci"
+          npm --prefix functions ci
+        fi
+      fi
+    - echo "$FIREBASE_SERVICE_ACCOUNT_KEY_B64" | base64 -d > "$CI_PROJECT_DIR/firebase-service-account.json"
+    - export GOOGLE_APPLICATION_CREDENTIALS="$CI_PROJECT_DIR/firebase-service-account.json"
+    - ./node_modules/.bin/firebase deploy --project "$FIREBASE_PROJECT_ID" --only functions,firestore:rules,firestore:indexes --non-interactive
+  after_script:
+    - rm -f "$CI_PROJECT_DIR/firebase-service-account.json"
+
+deploy_firebase_staging:
+  extends: .deploy_firebase
+  environment:
+    name: staging-backend
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "staging"'
+    - when: never
+
+deploy_firebase_production:
+  extends: .deploy_firebase
+  environment:
+    name: production-backend
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "master"'
+    - when: never
 
 deploy_staging:
   extends: .deploy_vercel

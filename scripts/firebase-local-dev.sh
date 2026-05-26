@@ -41,7 +41,6 @@ done
 echo "Firebase emulator is ready."
 echo "Emulator UI: http://127.0.0.1:4000"
 echo "Starting app on http://localhost:3000"
+echo "Open: http://localhost:3000/?deadlineFoodApiBackend=firebase&firebaseFunctionsBaseUrl=${FUNCTIONS_BASE_URL}"
 
-BUN_PUBLIC_DEADLINE_FOOD_API_BACKEND=firebase \
-BUN_PUBLIC_FIREBASE_FUNCTIONS_BASE_URL="$FUNCTIONS_BASE_URL" \
 bun run dev

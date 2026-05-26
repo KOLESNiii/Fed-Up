@@ -32,7 +32,7 @@ export function PlanScreen({
   prefs: Preferences;
   customRecipes: Meal[];
   setScreen: (screen: Screen) => void;
-  onSelectMeal?: (mealId: string) => void;
+  onSelectMeal: (mealId: string) => void;
 }) {
   const [rescueChoice, setRescueChoice] = useState<RescueChoice>(null);
   const originalDay = rescueChoice ? plan.find((entry) => entry.day === rescueChoice.day) : null;
@@ -106,7 +106,7 @@ export function PlanScreen({
                       <div className="flex h-full min-h-[190px] flex-col justify-between rounded-lg bg-stone-50 p-4">
                         <button
                           type="button"
-                          onClick={() => onSelectMeal?.(meal.id)}
+                          onClick={() => onSelectMeal(meal.id)}
                           className="text-left transition hover:text-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-700"
                         >
                           <div className="flex flex-wrap items-center gap-2">

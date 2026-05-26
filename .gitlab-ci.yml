@@ -126,8 +126,8 @@ firebase_functions:
         fi
       fi
     - bun run firebase:data
-    - cd functions && bun run lint
-    - cd functions && bun run build
+    - (cd functions && bun run lint)
+    - (cd functions && bun run build)
 
 e2e_tests:
   extends: .bun_job

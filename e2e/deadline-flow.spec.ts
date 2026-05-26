@@ -11,6 +11,9 @@ test("deadline food autopilot flow can onboard, rescue a meal, and add a recipe"
 
   await expect(page.getByRole("heading", { name: /what works for you/i })).toBeVisible();
   await page.getByRole("button", { name: "Tofu" }).click();
+  await page.getByPlaceholder("Add an ingredient you dislike").fill("Aubergine");
+  await page.getByPlaceholder("Add an ingredient you dislike").press("Enter");
+  await expect(page.getByRole("button", { name: "Aubergine" })).toBeVisible();
   await page.getByRole("button", { name: /continue/i }).click();
 
   await expect(page.getByRole("heading", { name: /choose your recipe sources/i })).toBeVisible();
@@ -23,9 +26,14 @@ test("deadline food autopilot flow can onboard, rescue a meal, and add a recipe"
   await expect(page.getByRole("heading", { name: /planned meals/i })).toBeVisible();
   await page.getByRole("button", { name: /overnight oat jar/i }).first().click();
   await expect(page.getByRole("heading", { name: /overnight oat jar/i })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /edit recipe/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /ingredients/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /method/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /nutrition/i })).toBeVisible();
   await expect(page.getByRole("heading", { name: /reviews/i })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /stats/i })).toBeVisible();
+  await page.getByRole("button", { name: /edit recipe/i }).click();
+  await expect(page.getByRole("heading", { name: /edit recipe/i })).toBeVisible();
+  await page.getByRole("button", { name: /save recipe/i }).click();
+  await expect(page.getByRole("heading", { name: /ingredients/i })).toBeVisible();
   await page.getByRole("button", { name: /back to plan/i }).click();
   await expect(page.getByRole("heading", { name: /planned meals/i })).toBeVisible();
   await page.getByRole("button", { name: /choose a different option/i }).first().click();

@@ -1,4 +1,4 @@
-import { Import } from "lucide-react";
+import { CalendarDays, Import, RotateCcw } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -116,10 +116,18 @@ export function SettingsScreen({
         </div>
         <div className="mt-6 rounded-lg bg-stone-50 p-4">
           <p className="font-semibold">Calendar connection</p>
-          <p className="mt-1 text-sm text-stone-500">Google Calendar - Sample connection enabled</p>
-          <AppButton variant="secondary" className="mt-4" onClick={() => track("settings_reimport_clicked")}>
-            <Import size={15} /> Re-import .ics
-          </AppButton>
+          <p className="mt-1 text-sm text-stone-500">Google Calendar is the primary connection. Calendar titles and times are used only to adapt meal effort around busy study days.</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <AppButton variant="secondary" onClick={() => track("settings_google_calendar_reconnect_clicked")}>
+              <RotateCcw size={15} /> Reconnect Google
+            </AppButton>
+            <AppButton variant="secondary" onClick={() => track("settings_calendar_manage_clicked")}>
+              <CalendarDays size={15} /> Manage calendar
+            </AppButton>
+            <AppButton variant="ghost" onClick={() => track("settings_reimport_clicked")}>
+              <Import size={15} /> Import .ics fallback
+            </AppButton>
+          </div>
         </div>
         <div className="mt-6 flex justify-end">
           <AppButton onClick={() => { track("settings_saved", { dietary_count: prefs.dietary.length, allergen_count: prefs.allergens.length, likes_count: prefs.likes.length, dislikes_count: prefs.dislikes.length }); setScreen("dashboard"); }}>Save preferences</AppButton>

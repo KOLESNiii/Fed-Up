@@ -136,34 +136,43 @@ export function Onboarding({
         {step === 0 && (
           <Card className="gap-0 rounded-lg border-stone-200 bg-white p-6 shadow-sm sm:p-8">
             <Badge tone="green">Step 1 of 3</Badge>
-            <h2 className="mt-4 text-3xl font-bold">Bring in your deadlines</h2>
-            <p className="mt-2 text-stone-600">We only need workload signals to plan around your difficult days.</p>
-            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+            <h2 className="mt-4 text-3xl font-bold">Connect your calendar</h2>
+            <p className="mt-2 text-stone-600">We use calendar titles and times to spot likely busy study days and lower cooking effort around them.</p>
+            <div className="mt-7 space-y-3">
               <button
                 type="button"
                 onClick={() => {
                   track("calendar_source_selected", { source: "google" });
                   setCalendarChoice("google");
                 }}
-                className={cn("rounded-lg border p-5 text-left transition", calendarChoice === "google" ? "border-emerald-600 bg-emerald-50" : "border-stone-200 hover:border-stone-300")}
+                className={cn("w-full rounded-lg border p-5 text-left transition", calendarChoice === "google" ? "border-emerald-600 bg-emerald-50" : "border-stone-200 hover:border-stone-300")}
               >
                 <CalendarDays className="mb-3 text-emerald-700" />
-                <p className="font-semibold">Link Google Calendar</p>
-                <p className="mt-1 text-sm text-stone-500">Prototype connection using sample deadlines</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold">Link Google Calendar</p>
+                  <Badge tone="green">Recommended</Badge>
+                </div>
+                <p className="mt-1 text-sm text-stone-500">Prototype connection using sample deadlines. You can reconnect or switch calendar later in settings.</p>
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  track("calendar_source_selected", { source: "ics" });
-                  fileRef.current?.click();
-                }}
-                className={cn("rounded-lg border p-5 text-left transition", calendarChoice === "ics" ? "border-emerald-600 bg-emerald-50" : "border-stone-200 hover:border-stone-300")}
-              >
-                <Import className="mb-3 text-emerald-700" />
-                <p className="font-semibold">Import .ics file</p>
-                <p className="mt-1 text-sm text-stone-500">Upload calendar export</p>
+              <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <div>
+                    <p className="font-semibold">Manual calendar file fallback</p>
+                    <p className="mt-1 text-sm text-stone-500">Use `.ics` only if account linking is not available. It is a one-off import rather than a live connection.</p>
+                  </div>
+                  <AppButton
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      track("calendar_source_selected", { source: "ics" });
+                      fileRef.current?.click();
+                    }}
+                  >
+                    <Import size={15} /> Import .ics
+                  </AppButton>
+                </div>
                 <Input ref={fileRef} type="file" accept=".ics,text/calendar" className="hidden" onChange={(event) => { setCalendarChoice("ics"); loadICS(event); }} />
-              </button>
+              </div>
             </div>
             {importMessage && <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{importMessage}</p>}
             <div className="mt-7 rounded-lg bg-stone-50 p-4">

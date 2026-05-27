@@ -91,6 +91,8 @@ export function ChoiceGroup({
             key={option}
             type="button"
             onClick={() => onToggle(option)}
+            aria-pressed={selected.includes(option)}
+            title={selected.includes(option) ? `Selected. Click to remove ${option}.` : `Click to add ${option}.`}
             className={cn(
               "rounded-full border px-3 py-2 text-sm transition",
               selected.includes(option)
@@ -100,7 +102,7 @@ export function ChoiceGroup({
                 : "border-stone-200 bg-white text-stone-600",
             )}
           >
-            {option}
+            {selected.includes(option) ? `${option} selected` : option}
           </button>
         ))}
       </div>

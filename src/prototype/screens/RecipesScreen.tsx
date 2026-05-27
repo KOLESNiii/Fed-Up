@@ -18,12 +18,22 @@ export function RecipesScreen({
   onSelectMeal: (mealId: string) => void;
   track: TrackPrototypeEvent;
 }) {
-  const [form, setForm] = useState({ name: "", minutes: 10, price: 2.5, ingredients: "", tags: "" });
+  const [form, setForm] = useState({ name: "", minutes: 10, totalCost: 5, servings: 2, ingredients: "", tags: "", steps: "" });
+  const costPerPortion = Math.max(0, +form.totalCost) / Math.max(1, +form.servings);
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!form.name.trim()) {
+    const ingredients = form.ingredients
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const instructions = form.steps
+      .split("\n")
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (!form.name.trim() || ingredients.length === 0 || +form.servings < 1 || +form.totalCost <= 0) {
       return;
     }
 
@@ -33,11 +43,8 @@ export function RecipesScreen({
         type: "cook",
         mealSlots: ["lunch", "dinner"],
         time: +form.minutes,
-        price: +form.price,
-        ingredients: form.ingredients
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean),
+        price: costPerPortion,
+        ingredients,
         tags: form.tags
           .split(",")
           .map((value) => value.trim())
@@ -46,9 +53,9 @@ export function RecipesScreen({
         nutrition: { calories: 500, protein: 20, carbs: 60, fat: 15 },
         rating: 0,
         reviews: [],
-        instructions: ["Prepare the ingredients.", "Cook or assemble the meal.", "Taste and adjust seasoning."],
+        instructions: instructions.length ? instructions : ["Prepare the ingredients.", "Cook or assemble the meal.", "Taste and adjust seasoning."],
         source: "My recipes",
-        note: "Added by you",
+        note: `${form.servings} portions from about ${money(+form.totalCost)} total`,
         image: "🍽️",
       } satisfies Meal;
 
@@ -57,10 +64,12 @@ export function RecipesScreen({
       meal_id: nextRecipe.id,
       minutes: nextRecipe.time,
       price: nextRecipe.price,
+      total_cost: +form.totalCost,
+      servings: +form.servings,
       ingredient_count: nextRecipe.ingredients.length,
       tag_count: nextRecipe.tags.length,
     });
-    setForm({ name: "", minutes: 10, price: 2.5, ingredients: "", tags: "" });
+    setForm({ name: "", minutes: 10, totalCost: 5, servings: 2, ingredients: "", tags: "", steps: "" });
   }
 
   return (
@@ -77,9 +86,15 @@ export function RecipesScreen({
               <Field label="Recipe name" value={form.name} onChange={(name) => setForm({ ...form, name })} placeholder="e.g. Microwave bean burrito" />
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Time (mins)" type="number" value={form.minutes} onChange={(minutes) => setForm({ ...form, minutes: +minutes })} />
-                <Field label="Cost / portion (£)" type="number" step="0.05" value={form.price} onChange={(price) => setForm({ ...form, price: +price })} />
+                <Field label="Servings" type="number" value={form.servings} onChange={(servings) => setForm({ ...form, servings: +servings })} />
               </div>
+              <Field label="Total recipe cost (£)" type="number" step="0.05" value={form.totalCost} onChange={(totalCost) => setForm({ ...form, totalCost: +totalCost })} />
+              <p className="rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-800">Estimated cost per portion: {money(costPerPortion)}</p>
               <Field label="Ingredients" value={form.ingredients} onChange={(ingredients) => setForm({ ...form, ingredients })} placeholder="beans, wrap, tomato" />
+              <label className="block">
+                <span className="text-sm font-semibold">Steps (optional)</span>
+                <textarea value={form.steps} onChange={(event) => setForm({ ...form, steps: event.target.value })} placeholder="One step per line" className="mt-2 min-h-28 w-full rounded-lg border border-stone-200 bg-white p-3 text-sm focus-visible:border-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/20" />
+              </label>
               <Field label="Tags" value={form.tags} onChange={(tags) => setForm({ ...form, tags })} placeholder="vegetarian, microwave" />
             </div>
             <AppButton type="submit" className="mt-6 w-full">

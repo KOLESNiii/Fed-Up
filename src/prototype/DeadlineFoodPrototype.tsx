@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePostHog } from "@posthog/react";
 
-import { capturePostHogEvent, registerPostHogSession, type AnalyticsProperties } from "@/lib/posthog";
+import { capturePostHogEvent, registerPostHogContext, registerPostHogSession, type AnalyticsProperties } from "@/lib/posthog";
 import { defaultDeadlines, initialPlan, initialPreferences } from "./data";
 import type { Deadline, Meal, PlanEntry, Preferences, Screen } from "./types";
 import {
@@ -20,6 +20,21 @@ import { PlanScreen } from "./screens/PlanScreen";
 import { RecipeDetailScreen } from "./screens/RecipeDetailScreen";
 import { RecipesScreen } from "./screens/RecipesScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
+
+function budgetBand(budget: number): string {
+  if (budget < 20) return "under_20";
+  if (budget < 35) return "20_to_34";
+  if (budget < 50) return "35_to_49";
+  return "50_plus";
+}
+
+function maxTimeBucket(maxTime: number | null): string {
+  if (maxTime === null) return "unlimited";
+  if (maxTime <= 15) return "15_or_less";
+  if (maxTime <= 30) return "16_to_30";
+  if (maxTime <= 60) return "31_to_60";
+  return "over_60";
+}
 
 export function DeadlineFoodPrototype() {
   const posthog = usePostHog();
@@ -44,6 +59,23 @@ export function DeadlineFoodPrototype() {
   useEffect(() => {
     registerPostHogSession(posthog, sessionId);
   }, [posthog, sessionId]);
+
+  useEffect(() => {
+    registerPostHogContext(posthog, {
+      current_screen: screen,
+      prototype_onboarded: onboarded,
+      deadline_count: deadlines.length,
+      custom_recipe_count: customRecipes.length,
+      selected_source_count: selectedSources.length,
+      budget_band: budgetBand(prefs.budget),
+      kitchen_access: prefs.kitchen,
+      max_time_bucket: maxTimeBucket(prefs.maxTime),
+      dietary_count: prefs.dietary.length,
+      allergen_count: prefs.allergens.length,
+      dislike_count: prefs.dislikes.length,
+      like_count: prefs.likes.length,
+    });
+  }, [customRecipes.length, deadlines.length, onboarded, posthog, prefs, screen, selectedSources.length]);
 
   useEffect(() => {
     track("prototype_screen_viewed", { screen });

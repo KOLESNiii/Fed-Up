@@ -5,6 +5,38 @@ PostHog is initialized in `src/lib/posthog.ts` using `BUN_PUBLIC_POSTHOG_PROJECT
 
 The app registers the existing anonymous prototype session ID with PostHog at startup. The same ID is also registered as the `anonymous_session_id` super property, so manual captures include it on every event.
 
+## Enabled PostHog Features
+
+| Feature | Configuration |
+|---|---|
+| Session replay | Enabled with `disable_session_recording: false` and `startSessionRecording(true)`. |
+| Replay privacy | All inputs are masked, text can be masked with `[data-ph-mask]`, full nodes can be blocked with `[data-ph-block]`, and request/response headers and bodies are removed from replay network captures. |
+| Autocapture | Explicitly enabled for click, change, and submit events on links, buttons, forms, inputs, selects, textareas, and labels. |
+| Rage clicks | Enabled with three clicks within 1000ms and a 30px threshold. |
+| Dead clicks | Enabled through `capture_dead_clicks`. |
+| Heatmaps | Enabled through `capture_heatmaps`. |
+| Performance | Network timing and web vitals enabled through `capture_performance`. |
+| Exceptions | Enabled through `capture_exceptions` and the React `PostHogErrorBoundary`. |
+| Page tracking | History-change pageviews and pageleave events enabled. |
+| Data protection | Personal URL properties are masked and raw postcode/sessionId properties are denied. |
+
+## Journey Dimensions
+
+The prototype registers dynamic super properties so manual events, autocapture, heatmaps, replay-linked events, rage clicks, and dead clicks can be sliced by user journey state:
+
+- `current_screen`
+- `prototype_onboarded`
+- `deadline_count`
+- `custom_recipe_count`
+- `selected_source_count`
+- `budget_band`
+- `kitchen_access`
+- `max_time_bucket`
+- `dietary_count`
+- `allergen_count`
+- `dislike_count`
+- `like_count`
+
 ## Instrumented Events
 
 | Event | Description |

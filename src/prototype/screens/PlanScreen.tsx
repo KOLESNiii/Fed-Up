@@ -136,8 +136,8 @@ export function PlanScreen({
                           </div>
                           <p className="mt-2 line-clamp-2 text-sm text-stone-500">{meal.source}</p>
                         </button>
-                        <AppButton variant="danger" className="mt-4 w-full justify-center px-3 py-2 text-xs" onClick={() => { track("meal_swap_started", { day: entry.day, meal_slot: slot, meal_id: meal.id, layout: "desktop" }); setRescueChoice({ day: entry.day, slot }); }}>
-                          <RefreshCcw size={15} /> Choose a different option
+                        <AppButton variant="secondary" className="mt-4 w-full justify-center px-3 py-2 text-xs" onClick={() => { track("meal_swap_started", { day: entry.day, meal_slot: slot, meal_id: meal.id, layout: "desktop" }); setRescueChoice({ day: entry.day, slot }); }}>
+                          <RefreshCcw size={15} /> Change meal
                         </AppButton>
                       </div>
                     </div>
@@ -170,8 +170,8 @@ export function PlanScreen({
                             {meal.time} mins - {money(meal.price)}
                           </p>
                         </button>
-                        <AppButton variant="danger" className="mt-3 w-full justify-center px-3 py-2 text-xs" onClick={() => { track("meal_swap_started", { day: entry.day, meal_slot: slot, meal_id: meal.id, layout: "mobile" }); setRescueChoice({ day: entry.day, slot }); }}>
-                          <RefreshCcw size={15} /> Choose a different option
+                        <AppButton variant="secondary" className="mt-3 w-full justify-center px-3 py-2 text-xs" onClick={() => { track("meal_swap_started", { day: entry.day, meal_slot: slot, meal_id: meal.id, layout: "mobile" }); setRescueChoice({ day: entry.day, slot }); }}>
+                          <RefreshCcw size={15} /> Change meal
                         </AppButton>
                       </div>
                     );
@@ -195,13 +195,13 @@ export function PlanScreen({
             <div className="flex justify-between">
               <div>
                 <Badge tone="amber">{slotLabels[rescueChoice.slot]}</Badge>
-                <h2 className="mt-3 text-2xl font-bold">Choose a different option</h2>
+                <h2 className="mt-3 text-2xl font-bold">Change this meal</h2>
               </div>
               <button type="button" aria-label="Close option chooser" onClick={() => { track("meal_swap_cancelled", { action: "close", day: rescueChoice.day, meal_slot: rescueChoice.slot }); setRescueChoice(null); }} className="h-fit rounded-lg p-2 hover:bg-stone-100">
                 <X size={18} />
               </button>
             </div>
-            <p className="mt-2 text-stone-600">Switch this meal without abandoning the rest of your plan.</p>
+            <p className="mt-2 text-stone-600">Switch this slot without changing the rest of your week. The planner keeps your budget and restrictions in view.</p>
             <div className="mt-5 space-y-3">
               <div className="rounded-lg bg-stone-50 p-4">
                 <p className="text-xs font-semibold uppercase text-stone-500">Original</p>
@@ -213,7 +213,7 @@ export function PlanScreen({
                 </div>
               </div>
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                <p className="text-xs font-semibold uppercase text-emerald-700">Lowest-effort suitable option</p>
+                <p className="text-xs font-semibold uppercase text-emerald-700">Suggested suitable option</p>
                 <div className="mt-2 flex justify-between gap-3">
                   <div>
                     <p className="font-semibold">
@@ -229,16 +229,19 @@ export function PlanScreen({
             </div>
             <div className="mt-5 rounded-lg bg-stone-900 p-4 text-sm text-white">
               <p>
-                <strong>{Math.max(0, originalMeal.time - replacement.time)} minutes saved.</strong> New weekly total: {money(newTotal)}.
+                <strong>{Math.max(0, originalMeal.time - replacement.time)} minutes saved.</strong> Plan total after this change: {money(newTotal)}.
               </p>
-              <p className="mt-1 text-stone-300">{prefs.budget - newTotal >= 0 ? `Still ${money(prefs.budget - newTotal)} within budget.` : `${money(newTotal - prefs.budget)} over budget.`}</p>
+              <p className="mt-1 text-stone-300">{prefs.budget - newTotal >= 0 ? `${money(prefs.budget - newTotal)} remains in your weekly budget.` : `This would put the plan ${money(newTotal - prefs.budget)} over budget.`}</p>
             </div>
-            <div className="mt-5 flex gap-3">
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <AppButton variant="secondary" className="flex-1" onClick={() => { track("meal_swap_cancelled", { action: "keep_original", day: rescueChoice.day, meal_slot: rescueChoice.slot }); setRescueChoice(null); }}>
                 Keep original
               </AppButton>
+              <AppButton variant="secondary" className="flex-1" onClick={() => { track("meal_swap_browse_clicked", { day: rescueChoice.day, meal_slot: rescueChoice.slot }); setRescueChoice(null); setScreen("discover"); }}>
+                Browse options
+              </AppButton>
               <AppButton className="flex-1" onClick={confirmSwap}>
-                Confirm swap
+                Use suggested meal
               </AppButton>
             </div>
           </Card>

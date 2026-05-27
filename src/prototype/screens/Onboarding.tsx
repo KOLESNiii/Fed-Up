@@ -8,6 +8,7 @@ import { allergens, dietary, dislikes, likes, sourceOptions, universities } from
 import type { Deadline, Preferences, Screen } from "../types";
 import { AppButton, Badge, ChoiceGroup, Field, SelectField } from "../components/primitives";
 import { formatCookingLimit } from "../utils";
+import { classifyImportedEvent } from "../workloadModel";
 import type { TrackPrototypeEvent } from "../analytics";
 
 function Progress({ step }: { step: number }) {
@@ -68,7 +69,19 @@ export function Onboarding({
       const label = date ? date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) : "Upcoming";
       const time = raw[2] ? `${raw[2].slice(0, 2)}:${raw[2].slice(2, 4)}` : "All day";
 
-      return { id: `ics-${index}`, title, date: label, time, intensity: "Imported" };
+      const eventType = classifyImportedEvent(title);
+
+      return {
+        id: `ics-${index}`,
+        title,
+        date: label,
+        time,
+        intensity: eventType === "academic" ? "Medium" : "Low",
+        eventType,
+        effortHours: eventType === "academic" ? 3 : 0,
+        urgency: eventType === "academic" ? "medium" : "low",
+        confirmed: false,
+      } satisfies Deadline;
     });
 
     return parsed.length ? parsed.slice(0, 5) : null;
@@ -168,7 +181,7 @@ export function Onboarding({
             {importMessage && <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{importMessage}</p>}
             <div className="mt-7 rounded-lg bg-stone-50 p-4">
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm font-semibold">Detected high-pressure events</p>
+                <p className="text-sm font-semibold">Detected study-load signals</p>
                 <Badge tone="amber">{deadlines.length} found</Badge>
               </div>
               <div className="space-y-2">

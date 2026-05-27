@@ -158,7 +158,7 @@ export function DeadlineFoodPrototype() {
   return (
     <Shell screen={screen} setScreen={setScreen} onboarded={onboarded} track={track}>
       {screen === "dashboard" && <Dashboard prefs={prefs} plan={plan} customRecipes={customRecipes} setScreen={setScreen} onSelectMeal={openRecipe} track={track} />}
-      {screen === "calendar" && <CalendarScreen deadlines={deadlines} setScreen={setScreen} track={track} />}
+      {screen === "calendar" && <CalendarScreen deadlines={deadlines} setDeadlines={setDeadlines} setScreen={setScreen} track={track} />}
       {screen === "plan" && <PlanScreen prefs={prefs} plan={plan} setPlan={setPlan} customRecipes={customRecipes} setScreen={setScreen} onSelectMeal={openRecipe} track={track} />}
       {screen === "discover" && <DiscoverScreen prefs={prefs} customRecipes={customRecipes} plan={plan} setPlan={setPlan} onSelectMeal={openRecipe} track={track} />}
       {screen === "recipes" && <RecipesScreen customRecipes={customRecipes} setCustomRecipes={setCustomRecipes} onSelectMeal={openRecipe} track={track} />}

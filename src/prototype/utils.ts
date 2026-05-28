@@ -1,5 +1,5 @@
 import { seedMeals } from "./data";
-import type { Meal } from "./types";
+import type { Meal, NutritionSource } from "./types";
 
 export function money(n: number) {
   return `£${n.toFixed(2)}`;
@@ -31,4 +31,18 @@ export function getMealById(id: string, customRecipes: Meal[]) {
   }
 
   return meal;
+}
+
+export function nutritionSourceSummary(source: NutritionSource | undefined) {
+  if (!source) return "Manual estimate";
+
+  const missing = source.missingIngredients ?? [];
+
+  if ((source.matchedIngredients?.length ?? 0) === 0 && missing.length === 0) {
+    return source.label;
+  }
+
+  return missing.length > 0
+    ? `${source.label} · couldn't find: ${missing.join(", ")}`
+    : `${source.label} · all matched`;
 }

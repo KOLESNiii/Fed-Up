@@ -222,7 +222,7 @@ export function PlanScreen({
       </div>
       {rescueChoice && originalMeal && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-stone-950/40 p-0 sm:items-center sm:p-5">
-          <Card className="w-full max-w-lg gap-0 rounded-t-lg bg-white p-6 shadow-2xl sm:rounded-lg">
+          <Card className="w-full max-w-lg gap-0 overflow-y-auto rounded-t-lg bg-white p-6 shadow-2xl max-h-[90dvh] sm:rounded-lg">
             {browseMode ? (
               <>
                 <div className="flex justify-between">
@@ -274,7 +274,7 @@ export function PlanScreen({
                     <X size={18} />
                   </button>
                 </div>
-                <p className="mt-2 text-stone-600">Switch this slot without changing the rest of your week. The planner keeps your budget and restrictions in view.</p>
+                <p className="mt-2 text-stone-600">Your budget and restrictions stay in view as you choose.</p>
                 <div className="mt-5 space-y-3">
                   <div className="rounded-lg bg-stone-50 p-4">
                     <p className="text-xs font-semibold uppercase text-stone-500">Original</p>
@@ -320,7 +320,7 @@ export function PlanScreen({
                   )}
                 </div>
                 {replacement && (
-                  <div className="mt-5 rounded-lg bg-stone-900 p-4 text-sm text-white">
+                  <div className="mt-5 rounded-lg bg-stone-900 p-4 text-center text-sm text-white">
                     <div className="grid gap-3 sm:grid-cols-3">
                       <div>
                         <p className="text-xs uppercase text-stone-400">Current plan</p>
@@ -336,7 +336,13 @@ export function PlanScreen({
                       </div>
                     </div>
                     <p className="mt-3 text-stone-300">
-                      Best fit saves <strong className="text-white">{Math.max(0, originalMeal.time - replacement.time)} minutes</strong> compared with the original.
+                      {originalMeal.time - replacement.time > 0 ? (
+                        <>Best fit saves <strong className="text-white">{originalMeal.time - replacement.time} minutes</strong> compared with the original.</>
+                      ) : originalMeal.time - replacement.time < 0 ? (
+                        <>Best fit takes <strong className="text-white">{replacement.time - originalMeal.time} minutes longer</strong> than the original.</>
+                      ) : (
+                        <>Best fit takes the same time as the original.</>
+                      )}
                     </p>
                   </div>
                 )}

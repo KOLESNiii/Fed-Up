@@ -8,7 +8,7 @@ test("deadline food autopilot flow can onboard, rescue a meal, and add a recipe"
 
   await expect(page.getByRole("heading", { name: /connect your calendar/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /link google calendar/i })).toBeVisible();
-  await expect(page.getByText(/manual calendar file fallback/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: /manual \(\.ics\)/i })).toBeVisible();
   await page.getByRole("button", { name: /continue/i }).click();
 
   await expect(page.getByRole("heading", { name: /what works for you/i })).toBeVisible();

@@ -1,10 +1,11 @@
-import { Plus, UtensilsCrossed } from "lucide-react";
+import { Plus, RefreshCcw, UtensilsCrossed } from "lucide-react";
 import { useState } from "react";
 
 import { Card } from "@/components/ui/card";
-import type { Meal } from "../types";
+import type { Meal, NutritionSource } from "../types";
 import { AppButton, Field } from "../components/primitives";
 import { formatIngredient, parseIngredients } from "../ingredients";
+import { fetchOpenFoodFactsNutrition } from "../nutritionApi";
 import { money } from "../utils";
 import type { TrackPrototypeEvent } from "../analytics";
 
@@ -20,6 +21,38 @@ export function RecipesScreen({
   track: TrackPrototypeEvent;
 }) {
   const [form, setForm] = useState({ name: "", minutes: 10, price: 2.5, ingredients: "", tags: "" });
+  const [nutritionLoading, setNutritionLoading] = useState(false);
+  const [nutritionStatus, setNutritionStatus] = useState<string | null>(null);
+  const [fetchedNutrition, setFetchedNutrition] = useState<{ calories: number; protein: number; carbs: number; fat: number; source?: NutritionSource } | null>(null);
+
+  async function estimateNutrition() {
+    const ingredients = parseIngredients(form.ingredients);
+
+    if (ingredients.length === 0) {
+      setNutritionStatus("Add at least one ingredient with a quantity first.");
+      return;
+    }
+
+    setNutritionLoading(true);
+    setNutritionStatus(null);
+
+    try {
+      const nutrition = await fetchOpenFoodFactsNutrition(ingredients);
+      setFetchedNutrition(nutrition);
+      const missing = nutrition.source?.missingIngredients ?? [];
+      setNutritionStatus(missing.length > 0 ? `Couldn't find: ${missing.join(", ")}` : "All ingredients matched");
+      track("recipe_nutrition_refreshed", {
+        provider: nutrition.source?.provider,
+        ingredient_count: ingredients.length,
+        matched_count: nutrition.source?.matchedIngredients?.length ?? 0,
+        missing_count: missing.length,
+      });
+    } catch (error) {
+      setNutritionStatus(error instanceof Error ? error.message : "Nutrition data could not be loaded.");
+    } finally {
+      setNutritionLoading(false);
+    }
+  }
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,7 +74,7 @@ export function RecipesScreen({
           .map((value) => value.trim())
           .filter(Boolean),
         allergens: [],
-        nutrition: { calories: 500, protein: 20, carbs: 60, fat: 15 },
+        nutrition: fetchedNutrition ?? { calories: 500, protein: 20, carbs: 60, fat: 15 },
         rating: 0,
         reviews: [],
         instructions: ["Prepare the ingredients.", "Cook or assemble the meal.", "Taste and adjust seasoning."],
@@ -59,6 +92,8 @@ export function RecipesScreen({
       tag_count: nextRecipe.tags.length,
     });
     setForm({ name: "", minutes: 10, price: 2.5, ingredients: "", tags: "" });
+    setFetchedNutrition(null);
+    setNutritionStatus(null);
   }
 
   return (
@@ -79,6 +114,35 @@ export function RecipesScreen({
               </div>
               <Field label="Ingredients with quantities" value={form.ingredients} onChange={(ingredients) => setForm({ ...form, ingredients })} placeholder="120g beans, 1 wrap, 50g tomato" />
               <Field label="Tags" value={form.tags} onChange={(tags) => setForm({ ...form, tags })} placeholder="vegetarian, microwave" />
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-stone-50 p-3">
+                <div>
+                  <p className="text-sm font-semibold">Nutrition estimate</p>
+                  <p className="mt-0.5 text-xs text-stone-500">{nutritionStatus ?? (fetchedNutrition ? "Fetched from OpenFoodFacts" : "Optional — pull from OpenFoodFacts")}</p>
+                </div>
+                <AppButton type="button" variant="secondary" onClick={estimateNutrition} disabled={nutritionLoading}>
+                  <RefreshCcw size={16} /> {nutritionLoading ? "Checking..." : "Estimate nutrition"}
+                </AppButton>
+              </div>
+              {fetchedNutrition && (
+                <div className="grid grid-cols-4 gap-2 text-center text-sm">
+                  <div className="rounded-lg bg-stone-50 p-2">
+                    <p className="font-semibold">{fetchedNutrition.calories}</p>
+                    <p className="text-xs text-stone-500">kcal</p>
+                  </div>
+                  <div className="rounded-lg bg-stone-50 p-2">
+                    <p className="font-semibold">{fetchedNutrition.protein}g</p>
+                    <p className="text-xs text-stone-500">protein</p>
+                  </div>
+                  <div className="rounded-lg bg-stone-50 p-2">
+                    <p className="font-semibold">{fetchedNutrition.carbs}g</p>
+                    <p className="text-xs text-stone-500">carbs</p>
+                  </div>
+                  <div className="rounded-lg bg-stone-50 p-2">
+                    <p className="font-semibold">{fetchedNutrition.fat}g</p>
+                    <p className="text-xs text-stone-500">fat</p>
+                  </div>
+                </div>
+              )}
             </div>
             <AppButton type="submit" className="mt-6 w-full">
               <Plus size={16} /> Add recipe

@@ -57,18 +57,17 @@ function ratingLabel(rating: number) {
 }
 
 function nutritionSourceSummary(source: NutritionSource | undefined) {
-  if (!source) {
-    return "Manual estimate";
-  }
+  if (!source) return "Manual estimate";
 
-  const matchedCount = source.matchedIngredients?.length ?? 0;
-  const missingCount = source.missingIngredients?.length ?? 0;
+  const missing = source.missingIngredients ?? [];
 
-  if (matchedCount === 0 && missingCount === 0) {
+  if ((source.matchedIngredients?.length ?? 0) === 0 && missing.length === 0) {
     return source.label;
   }
 
-  return `${source.label} - ${matchedCount} matched${missingCount > 0 ? `, ${missingCount} missing` : ""}`;
+  return missing.length > 0
+    ? `${source.label} · couldn't find: ${missing.join(", ")}`
+    : `${source.label} · all matched`;
 }
 
 export function RecipeDetailScreen({

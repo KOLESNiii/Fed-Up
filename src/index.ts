@@ -120,6 +120,8 @@ async function findProductForIngredient(ingredient: RecipeIngredient): Promise<O
     }
   }
 
+  // Cache miss so repeated button presses return consistent results
+  productCache.set(cacheKey, null);
   return null;
 }
 

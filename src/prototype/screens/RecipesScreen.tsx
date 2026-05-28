@@ -19,7 +19,15 @@ export function RecipesScreen({
   track: TrackPrototypeEvent;
 }) {
   const [form, setForm] = useState({ name: "", minutes: 10, totalCost: 5, servings: 2, ingredients: "", tags: "", steps: "" });
+  const [attempted, setAttempted] = useState(false);
   const costPerPortion = Math.max(0, +form.totalCost) / Math.max(1, +form.servings);
+
+  const errors = {
+    name: !form.name.trim(),
+    ingredients: form.ingredients.split(",").map((v) => v.trim()).filter(Boolean).length === 0,
+    servings: +form.servings < 1,
+    totalCost: +form.totalCost <= 0,
+  };
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -33,7 +41,8 @@ export function RecipesScreen({
       .map((value) => value.trim())
       .filter(Boolean);
 
-    if (!form.name.trim() || ingredients.length === 0 || +form.servings < 1 || +form.totalCost <= 0) {
+    if (errors.name || errors.ingredients || errors.servings || errors.totalCost) {
+      setAttempted(true);
       return;
     }
 
@@ -69,6 +78,7 @@ export function RecipesScreen({
       ingredient_count: nextRecipe.ingredients.length,
       tag_count: nextRecipe.tags.length,
     });
+    setAttempted(false);
     setForm({ name: "", minutes: 10, totalCost: 5, servings: 2, ingredients: "", tags: "", steps: "" });
   }
 
@@ -83,17 +93,17 @@ export function RecipesScreen({
           <form onSubmit={submit}>
             <h2 className="text-xl font-bold">New recipe</h2>
             <div className="mt-5 space-y-4">
-              <Field label="Recipe name" value={form.name} onChange={(name) => setForm({ ...form, name })} placeholder="e.g. Microwave bean burrito" />
+              <Field label="Recipe name" value={form.name} onChange={(name) => setForm({ ...form, name })} placeholder="e.g. Microwave bean burrito" error={attempted && errors.name} errorMessage="Please enter a recipe name" />
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Time (mins)" type="number" value={form.minutes} onChange={(minutes) => setForm({ ...form, minutes: +minutes })} />
-                <Field label="Servings" type="number" value={form.servings} onChange={(servings) => setForm({ ...form, servings: +servings })} />
+                <Field label="Servings" type="number" value={form.servings} onChange={(servings) => setForm({ ...form, servings: +servings })} error={attempted && errors.servings} errorMessage="Must be at least 1" />
               </div>
-              <Field label="Total recipe cost (£)" type="number" step="0.05" value={form.totalCost} onChange={(totalCost) => setForm({ ...form, totalCost: +totalCost })} />
+              <Field label="Total recipe cost (£)" type="number" step="0.05" value={form.totalCost} onChange={(totalCost) => setForm({ ...form, totalCost: +totalCost })} error={attempted && errors.totalCost} errorMessage="Please enter a cost" />
               <p className="rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-800">Estimated cost per portion: {money(costPerPortion)}</p>
-              <Field label="Ingredients" value={form.ingredients} onChange={(ingredients) => setForm({ ...form, ingredients })} placeholder="beans, wrap, tomato" />
+              <Field label="Ingredients" value={form.ingredients} onChange={(ingredients) => setForm({ ...form, ingredients })} placeholder="beans, wrap, tomato" error={attempted && errors.ingredients} errorMessage="Add at least one ingredient" />
               <label className="block">
-                <span className="text-sm font-semibold">Steps (optional)</span>
-                <textarea value={form.steps} onChange={(event) => setForm({ ...form, steps: event.target.value })} placeholder="One step per line" className="mt-2 min-h-28 w-full rounded-lg border border-stone-200 bg-white p-3 text-sm focus-visible:border-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/20" />
+                <span className="text-sm font-semibold">Steps</span>
+                <textarea value={form.steps} onChange={(event) => setForm({ ...form, steps: event.target.value })} placeholder="One step per line" className="mt-2 min-h-28 w-full rounded-lg border border-stone-200 bg-white p-3 text-sm placeholder:text-muted-foreground focus-visible:border-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600/20" />
               </label>
               <Field label="Tags" value={form.tags} onChange={(tags) => setForm({ ...form, tags })} placeholder="vegetarian, microwave" />
             </div>

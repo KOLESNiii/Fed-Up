@@ -1,4 +1,11 @@
-import type { Deadline, Meal, MealSlot, PlanEntry, Preferences, RecipeReview } from "./types";
+import type { CalendarProvider, Deadline, Meal, MealSlot, PlanEntry, Preferences, RecipeReview } from "./types";
+
+export const calendarProviders: { id: CalendarProvider; name: string; hint: string; recommended: boolean }[] = [
+  { id: "google", name: "Google Calendar", hint: "Link with your Google account", recommended: true },
+  { id: "outlook", name: "Outlook Calendar", hint: "Link with your Microsoft account", recommended: false },
+  { id: "apple", name: "Apple Calendar", hint: "Link with your Apple ID", recommended: false },
+  { id: "manual", name: "Manual (.ics)", hint: "One-time file import", recommended: false },
+];
 
 export const days = ["Mon 1 Jun", "Tue 2 Jun", "Wed 3 Jun", "Thu 4 Jun", "Fri 5 Jun"];
 export const mealSlots: MealSlot[] = ["breakfast", "lunch", "dinner"];
@@ -287,11 +294,11 @@ export const initialPlan: PlanEntry[] = [
 ];
 
 export const sourceOptions = [
-  { id: "budget", name: "Budget Bytes", desc: "Low-cost recipes" },
-  { id: "bbc", name: "BBC Good Food", desc: "Reliable quick meals" },
-  { id: "student", name: "Student Eats", desc: "Student-focused cooking" },
-  { id: "own", name: "My own recipes", desc: "Recipes you add" },
-  { id: "campus", name: "Campus fallback options", desc: "Illustrative nearby picks" },
+  { id: "budget", name: "Keep costs low", desc: "Prefer low-cost recipes and cheaper swaps" },
+  { id: "bbc", name: "Reliable familiar meals", desc: "Prefer straightforward recipes from trusted sources" },
+  { id: "student", name: "Student-focused cooking", desc: "Prefer minimal equipment and realistic prep" },
+  { id: "own", name: "Use my own recipes", desc: "Include recipes you add yourself" },
+  { id: "campus", name: "Allow campus fallbacks", desc: "Use nearby ready options when cooking is not realistic" },
 ];
 
 export const allergens = ["Peanuts", "Tree nuts", "Milk", "Eggs", "Gluten", "Soy", "Sesame", "Shellfish"];

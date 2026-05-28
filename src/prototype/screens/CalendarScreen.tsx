@@ -164,7 +164,7 @@ export function CalendarScreen({
   function startManualWorkload(day: string) {
     setSelectedId(null);
     setFormErrors({});
-    setDraft({ day, title: "", time: "", urgency: null, effortHours: 3 });
+    setDraft({ day, title: "", time: "", urgency: null, effortHours: 1 });
     track("calendar_manual_workload_started", { day });
   }
 
@@ -378,16 +378,18 @@ export function CalendarScreen({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setDraft({ ...draft, effortHours: Math.max(1, draft.effortHours - 1) })}
-                  disabled={draft.effortHours <= 1}
+                  onClick={() => setDraft({ ...draft, effortHours: Math.max(0.5, draft.effortHours - 0.5) })}
+                  disabled={draft.effortHours <= 0.5}
                   className="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-30"
                 >
                   <Minus size={14} />
                 </button>
-                <span className="min-w-[3.5rem] text-center text-lg font-semibold text-stone-900">{draft.effortHours}h</span>
+                <span className="min-w-[4rem] text-center text-lg font-semibold text-stone-900">
+                  {draft.effortHours % 1 === 0 ? `${draft.effortHours}h` : `${Math.floor(draft.effortHours)}h 30m`}
+                </span>
                 <button
                   type="button"
-                  onClick={() => setDraft({ ...draft, effortHours: Math.min(12, draft.effortHours + 1) })}
+                  onClick={() => setDraft({ ...draft, effortHours: Math.min(12, draft.effortHours + 0.5) })}
                   disabled={draft.effortHours >= 12}
                   className="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-30"
                 >

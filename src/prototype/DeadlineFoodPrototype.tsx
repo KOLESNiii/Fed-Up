@@ -21,6 +21,15 @@ import { RecipeDetailScreen } from "./screens/RecipeDetailScreen";
 import { RecipesScreen } from "./screens/RecipesScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 
+const screens: Screen[] = ["landing", "onboarding", "dashboard", "calendar", "plan", "discover", "recipes", "settings", "recipe-detail"];
+
+function screenFromHash(): Screen | null {
+  if (typeof window === "undefined") return null;
+
+  const value = window.location.hash.replace("#/", "") as Screen;
+  return screens.includes(value) ? value : null;
+}
+
 function budgetBand(budget: number): string {
   if (budget < 20) return "under_20";
   if (budget < 35) return "20_to_34";
@@ -40,7 +49,7 @@ export function DeadlineFoodPrototype() {
   const posthog = usePostHog();
   const [sessionId] = useState(() => getOrCreateAnonymousSessionId());
   const [sessionLoaded, setSessionLoaded] = useState(false);
-  const [screen, setScreen] = useState<Screen>("landing");
+  const [screen, setScreen] = useState<Screen>(() => screenFromHash() ?? "landing");
   const [onboarded, setOnboarded] = useState(false);
   const [deadlines, setDeadlines] = useState<Deadline[]>(defaultDeadlines);
   const [prefs, setPrefs] = useState<Preferences>(initialPreferences);
@@ -50,6 +59,11 @@ export function DeadlineFoodPrototype() {
   const [discoverSaved, setDiscoverSaved] = useState<Meal[]>([]);
   const [discoverRejected, setDiscoverRejected] = useState<Meal[]>([]);
   const [selectedMealId, setSelectedMealId] = useState(initialPlan[0]?.meals[0]?.mealId ?? "m1");
+  const navigateScreen = useCallback((nextScreen: Screen) => {
+    if (screen === nextScreen) return;
+    window.location.hash = `/${nextScreen}`;
+    setScreen(nextScreen);
+  }, [screen]);
 
   const track = useCallback(
     (eventName: string, properties: AnalyticsProperties = {}) => {
@@ -61,6 +75,18 @@ export function DeadlineFoodPrototype() {
   useEffect(() => {
     registerPostHogSession(posthog, sessionId);
   }, [posthog, sessionId]);
+
+  useEffect(() => {
+    function onHashChange() {
+      const nextScreen = screenFromHash();
+      if (nextScreen) {
+        setScreen(nextScreen);
+      }
+    }
+
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
 
   useEffect(() => {
     registerPostHogContext(posthog, {
@@ -134,18 +160,18 @@ export function DeadlineFoodPrototype() {
   function openRecipe(mealId: string) {
     track("recipe_viewed", { meal_id: mealId, source_screen: screen });
     setSelectedMealId(mealId);
-    setScreen("recipe-detail");
+    navigateScreen("recipe-detail");
   }
 
   if (screen === "landing") {
-    return <Landing onStart={() => setScreen(onboarded ? "dashboard" : "onboarding")} track={track} />;
+    return <Landing onStart={() => navigateScreen(onboarded ? "dashboard" : "onboarding")} track={track} />;
   }
 
   if (!onboarded && screen === "onboarding") {
     return (
       <Onboarding
         setOnboarded={setOnboarded}
-        setScreen={setScreen}
+        setScreen={navigateScreen}
         prefs={prefs}
         setPrefs={setPrefs}
         deadlines={deadlines}
@@ -164,8 +190,8 @@ export function DeadlineFoodPrototype() {
       {screen === "plan" && <PlanScreen prefs={prefs} plan={plan} setPlan={setPlan} customRecipes={customRecipes} setScreen={setScreen} onSelectMeal={openRecipe} track={track} />}
       {screen === "discover" && <DiscoverScreen prefs={prefs} customRecipes={customRecipes} plan={plan} setPlan={setPlan} saved={discoverSaved} setSaved={setDiscoverSaved} rejected={discoverRejected} setRejected={setDiscoverRejected} onSelectMeal={openRecipe} track={track} />}
       {screen === "recipes" && <RecipesScreen customRecipes={customRecipes} setCustomRecipes={setCustomRecipes} onSelectMeal={openRecipe} track={track} />}
-      {screen === "settings" && <SettingsScreen prefs={prefs} setPrefs={setPrefs} setScreen={setScreen} track={track} />}
-      {screen === "recipe-detail" && <RecipeDetailScreen key={selectedMealId} mealId={selectedMealId} customRecipes={customRecipes} setCustomRecipes={setCustomRecipes} setScreen={setScreen} track={track} />}
+      {screen === "settings" && <SettingsScreen prefs={prefs} setPrefs={setPrefs} setScreen={navigateScreen} track={track} />}
+      {screen === "recipe-detail" && <RecipeDetailScreen key={selectedMealId} mealId={selectedMealId} customRecipes={customRecipes} setCustomRecipes={setCustomRecipes} setScreen={navigateScreen} track={track} />}
     </Shell>
   );
 }

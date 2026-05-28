@@ -13,6 +13,10 @@ export function DiscoverScreen({
   customRecipes,
   setPlan,
   plan,
+  saved,
+  setSaved,
+  rejected,
+  setRejected,
   onSelectMeal,
   track,
 }: {
@@ -20,14 +24,16 @@ export function DiscoverScreen({
   customRecipes: Meal[];
   setPlan: (plan: PlanEntry[]) => void;
   plan: PlanEntry[];
+  saved: Meal[];
+  setSaved: (saved: Meal[]) => void;
+  rejected: Meal[];
+  setRejected: (rejected: Meal[]) => void;
   onSelectMeal: (mealId: string) => void;
   track: TrackPrototypeEvent;
 }) {
   const initialQueue = [...customRecipes, ...seedMeals.filter((meal) => !customRecipes.some((customMeal) => customMeal.id === meal.id))];
   const [sortBy, setSortBy] = useState<"priority" | "time" | "price" | "health">("priority");
-  const [queue, setQueue] = useState(initialQueue);
-  const [saved, setSaved] = useState<Meal[]>([]);
-  const [rejected, setRejected] = useState<Meal[]>([]);
+  const [queue, setQueue] = useState(() => initialQueue.filter((meal) => !saved.some((s) => s.id === meal.id) && !rejected.some((r) => r.id === meal.id)));
   const sortedQueue = [...queue].sort((a, b) => {
     if (sortBy === "time") return a.time - b.time;
     if (sortBy === "price") return a.price - b.price;

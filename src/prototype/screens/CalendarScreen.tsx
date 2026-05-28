@@ -232,7 +232,9 @@ export function CalendarScreen({
 
       <div className="grid gap-4 md:grid-cols-5">
         {days.map((day) => {
-          const dayDeadlines = deadlines.filter((entry) => entry.date === day || entry.date.includes(day.split(" ")[0] ?? ""));
+          const dayDeadlines = deadlines
+            .filter((entry) => entry.date === day || entry.date.includes(day.split(" ")[0] ?? ""))
+            .sort((a, b) => a.time.localeCompare(b.time));
           const isDraftDay = draft?.day === day;
 
           return (

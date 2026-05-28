@@ -22,6 +22,10 @@ test("deadline food autopilot flow can onboard, rescue a meal, and add a recipe"
   await page.getByPlaceholder("Add an ingredient you dislike").fill("Aubergine");
   await page.getByPlaceholder("Add an ingredient you dislike").press("Enter");
   await expect(page.getByRole("button", { name: "Aubergine" })).toBeVisible();
+  await page.getByLabel("Kitchen access").click();
+  await page.getByRole("option", { name: "Full kitchen" }).click();
+  await page.getByLabel("Your university").click();
+  await page.getByRole("option", { name: "Imperial College London" }).click();
   await page.getByRole("button", { name: /continue/i }).click();
 
   await expect(page.getByRole("heading", { name: /choose recommendation priorities/i })).toBeVisible();
@@ -52,7 +56,7 @@ test("deadline food autopilot flow can onboard, rescue a meal, and add a recipe"
   await page.getByRole("button", { name: /change meal/i }).first().click();
   await expect(page.getByRole("heading", { name: /change this meal/i })).toBeVisible();
   await expect(page.getByText(/suggested suitable option/i)).toBeVisible();
-  await expect(page.getByText(/plan total after this change/i)).toBeVisible();
+  await expect(page.getByText(/after best fit/i)).toBeVisible();
   await page.getByRole("button", { name: /use suggested meal/i }).click();
   await expect(page.getByText("Rescued")).toBeVisible();
 

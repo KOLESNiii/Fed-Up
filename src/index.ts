@@ -13,6 +13,7 @@ const sessionRetentionDays = 90;
 const anonymousSessions = new Map<string, { settings: unknown; updatedAt: string; expiresAt: string }>();
 const sessionIdPattern = /^[A-Za-z0-9_-]{16,80}$/;
 const openFoodFactsUserAgent = "DeadlineFoodPrototype/0.1";
+const openFoodFactsTimeoutMs = 6000;
 const freshIngredientSearchHints = new Set([
   "banana",
   "berries",
@@ -27,6 +28,11 @@ const freshIngredientSearchHints = new Set([
   "tomato",
   "vegetables",
 ]);
+const cookingAdjectives = new Set([
+  "baby", "canned", "chopped", "cooked", "diced", "dried", "frozen", "grated",
+  "large", "medium", "minced", "organic", "raw", "sliced", "small", "tinned", "whole",
+]);
+const productCache = new Map<string, OpenFoodFactsProduct | null>();
 
 type OpenFoodFactsSearchResponse = {
   products?: OpenFoodFactsProduct[];
@@ -58,14 +64,29 @@ function expiresAtFromNow() {
   return new Date(Date.now() + sessionRetentionDays * 24 * 60 * 60 * 1000).toISOString();
 }
 
-function openFoodFactsSearchTerm(ingredient: RecipeIngredient) {
-  const name = ingredient.name.trim();
-  return freshIngredientSearchHints.has(name.toLowerCase()) ? `${name} fresh` : name;
+function ingredientSearchTerms(ingredient: RecipeIngredient): string[] {
+  const name = ingredient.name.trim().toLowerCase();
+  const terms: string[] = [];
+
+  terms.push(freshIngredientSearchHints.has(name) ? `${name} fresh` : name);
+
+  const words = name.split(" ");
+  if (words.length > 1 && words[0] && cookingAdjectives.has(words[0])) {
+    const stripped = words.slice(1).join(" ");
+    const strippedTerm = freshIngredientSearchHints.has(stripped) ? `${stripped} fresh` : stripped;
+    if (!terms.includes(strippedTerm)) terms.push(strippedTerm);
+  }
+
+  if (words.length > 1 && words[0] && words[0].length > 2 && !terms.includes(words[0])) {
+    terms.push(words[0]);
+  }
+
+  return terms;
 }
 
-async function fetchOpenFoodFactsProducts(ingredient: RecipeIngredient) {
+async function fetchOpenFoodFactsProducts(searchTerm: string) {
   const url = new URL("https://world.openfoodfacts.org/cgi/search.pl");
-  url.searchParams.set("search_terms", openFoodFactsSearchTerm(ingredient));
+  url.searchParams.set("search_terms", searchTerm);
   url.searchParams.set("search_simple", "1");
   url.searchParams.set("action", "process");
   url.searchParams.set("json", "1");
@@ -73,18 +94,33 @@ async function fetchOpenFoodFactsProducts(ingredient: RecipeIngredient) {
   url.searchParams.set("fields", "product_name,nutriments,code");
 
   const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": openFoodFactsUserAgent,
-    },
-  });
+    headers: { Accept: "application/json", "User-Agent": openFoodFactsUserAgent },
+    signal: AbortSignal.timeout(openFoodFactsTimeoutMs),
+  }).catch(() => null);
 
-  if (!response.ok) {
-    return [];
-  }
+  if (!response?.ok) return [];
 
   const payload = await response.json().catch(() => null) as OpenFoodFactsSearchResponse | null;
   return payload?.products ?? [];
+}
+
+async function findProductForIngredient(ingredient: RecipeIngredient): Promise<OpenFoodFactsProduct | null> {
+  const cacheKey = ingredient.name.trim().toLowerCase();
+
+  if (productCache.has(cacheKey)) {
+    return productCache.get(cacheKey) ?? null;
+  }
+
+  for (const term of ingredientSearchTerms(ingredient)) {
+    const products = await fetchOpenFoodFactsProducts(term);
+    const match = products.find((p) => estimateIngredientNutrition(ingredient, p) !== null);
+    if (match) {
+      productCache.set(cacheKey, match);
+      return match;
+    }
+  }
+
+  return null;
 }
 
 const server = serve({
@@ -125,11 +161,9 @@ const server = serve({
         }
 
         const lookups = await Promise.all(
-          ingredients.map(async ingredient => {
-            const products = await fetchOpenFoodFactsProducts(ingredient);
-            return products
-              .map((product) => estimateIngredientNutrition(ingredient, product))
-              .find((estimate) => estimate !== null) ?? null;
+          ingredients.map(async (ingredient) => {
+            const product = await findProductForIngredient(ingredient);
+            return product ? estimateIngredientNutrition(ingredient, product) : null;
           }),
         );
         const estimates = lookups.filter((estimate): estimate is NonNullable<typeof estimate> => estimate !== null);

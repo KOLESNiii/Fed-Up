@@ -66,9 +66,9 @@ export function SettingsScreen({
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="text-3xl font-bold">Preferences</h1>
-      <p className="mt-2 text-stone-600">Your saved limits shape every plan and replacement.</p>
+      <div className="mx-auto max-w-2xl">
+        <h1 className="text-3xl font-bold">Preferences</h1>
+      <p className="mt-2 text-stone-600">Update the limits used for future plans and meal replacements.</p>
       <Card className="mt-7 gap-0 rounded-lg border-stone-200 bg-white p-6">
         <div className="grid gap-5 sm:grid-cols-2">
           <label>
@@ -108,9 +108,18 @@ export function SettingsScreen({
             options={universities.map((university) => ({ value: university, label: university }))}
           />
         </div>
+        <div className="mt-4 rounded-lg border border-stone-200 bg-stone-50 p-4 text-sm leading-6 text-stone-600">
+          <p className="font-semibold text-stone-900">Location and privacy</p>
+          <p className="mt-1">
+            University is used for campus meal context. Postcode can be a broad area or campus postcode; it helps estimate nearby shop and fallback options.
+          </p>
+          <button type="button" onClick={() => track("privacy_policy_opened", { source: "settings_location" })} className="mt-2 font-semibold text-emerald-700 underline underline-offset-4">
+            View privacy summary
+          </button>
+        </div>
         <div className="mt-6 space-y-5">
           <ChoiceGroup
-            title="Dietary requirements"
+            title="Dietary requirements (leave blank if none)"
             options={dietary}
             selected={prefs.dietary}
             onToggle={(value) => toggle(prefs.dietary, value, (next) => setPrefs({ ...prefs, dietary: next }))}
@@ -127,12 +136,12 @@ export function SettingsScreen({
             danger
           />
           <ChoiceGroup
-            title="Foods and meals I like"
+            title="Optional inspiration foods"
             options={likes}
             selected={prefs.likes}
             onToggle={(value) => toggle(prefs.likes, value, (next) => setPrefs({ ...prefs, likes: next }))}
             onAdd={(value) => addSelection(prefs.likes, value, (next) => setPrefs({ ...prefs, likes: next }))}
-            addPlaceholder="Add anything else you like"
+            addPlaceholder="Add a meal you often choose"
           />
           <ChoiceGroup
             title="Ingredients I dislike"
@@ -180,7 +189,8 @@ export function SettingsScreen({
           <Input ref={fileRef} type="file" accept=".ics,text/calendar" className="hidden" onChange={handleICSImport} />
           {importMessage && <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{importMessage}</p>}
         </div>
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <AppButton variant="secondary" onClick={() => setScreen("dashboard")}>Back to dashboard</AppButton>
           <AppButton onClick={() => { track("settings_saved", { dietary_count: prefs.dietary.length, allergen_count: prefs.allergens.length, likes_count: prefs.likes.length, dislikes_count: prefs.dislikes.length }); setScreen("dashboard"); }}>Save preferences</AppButton>
         </div>
       </Card>

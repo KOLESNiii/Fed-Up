@@ -43,7 +43,11 @@ export function AppButton({
     <ShadcnButton
       {...props}
       variant="ghost"
-      className={cn("h-auto rounded-lg px-4 py-2.5 text-sm font-semibold transition", appButtonClasses[variant], className)}
+      className={cn(
+        "h-auto rounded-lg px-4 py-2.5 text-sm font-semibold transition active:translate-y-px disabled:pointer-events-none disabled:opacity-60",
+        appButtonClasses[variant],
+        className,
+      )}
     >
       {children}
     </ShadcnButton>

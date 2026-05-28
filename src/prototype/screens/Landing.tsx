@@ -23,9 +23,6 @@ export function Landing({ onStart, track }: { onStart: () => void; track: TrackP
             <AppButton onClick={() => { track("deadline_mode_started", { entry_point: "setup_cta" }); onStart(); }} className="px-6 py-3">
               Build my meal plan <ArrowRight size={17} />
             </AppButton>
-            <AppButton variant="secondary" onClick={() => { track("deadline_mode_started", { entry_point: "explore_demo" }); onStart(); }} className="px-6 py-3">
-              Explore demo
-            </AppButton>
           </div>
           <p className="mt-7 text-sm text-stone-500">No judgement. No calorie targets. Just food choices that fit the week you actually have.</p>
         </div>

@@ -1,4 +1,4 @@
-import { ArrowLeft, MessageSquare, Pencil, Save, X } from "lucide-react";
+import { ArrowLeft, MessageSquare, Pencil, Save, ShoppingCart, X } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 
 import { Card } from "@/components/ui/card";
@@ -52,6 +52,11 @@ function splitList(value: string) {
 
 function ratingLabel(rating: number) {
   return rating > 0 ? `${rating.toFixed(1)} / 5` : "No ratings yet";
+}
+
+function vendorBasketUrl(meal: Meal) {
+  const query = meal.ingredients.join(" ");
+  return `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(query)}`;
 }
 
 export function RecipeDetailScreen({

@@ -50,6 +50,12 @@ export function DiscoverScreen({
     setQueue(queue.filter((meal) => meal.id !== current?.id));
   }
 
+  function undo(meal: Meal) {
+    setRejected(rejected.filter((m) => m.id !== meal.id));
+    setQueue([meal, ...queue]);
+    track("discover_recipe_undo", { meal_id: meal.id });
+  }
+
   function addToPlan(meal: Meal) {
     const targetSlot = meal.mealSlots.includes("dinner") ? "dinner" : (meal.mealSlots[0] ?? "dinner");
 
@@ -136,9 +142,19 @@ export function DiscoverScreen({
           <p className="mt-1 text-sm text-stone-500">Add one directly into Tuesday's plan.</p>
           <div className="mt-4 space-y-3">
             {rejected.length > 0 && (
-              <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
-                Rejected: {rejected.map((meal) => meal.name).join(", ")}
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase text-stone-400">Recently passed</p>
+                {rejected.map((meal) => (
+                  <div key={meal.id} className="grid gap-3 rounded-lg bg-rose-50 p-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-stone-800">{meal.image} {meal.name}</p>
+                      <p className="text-sm text-stone-500">{meal.time} min · {money(meal.price)}</p>
+                    </div>
+                    <AppButton variant="secondary" onClick={() => undo(meal)}>Undo</AppButton>
+                    <AppButton variant="ghost" onClick={() => onSelectMeal(meal.id)}>View</AppButton>
+                  </div>
+                ))}
+              </div>
             )}
             {saved.length === 0 ? (
               <p className="rounded-lg bg-stone-50 p-4 text-sm text-stone-500">Swipe right on a suitable recipe to save it here.</p>

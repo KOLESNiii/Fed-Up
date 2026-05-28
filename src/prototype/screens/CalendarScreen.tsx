@@ -251,17 +251,24 @@ export function CalendarScreen({
                         setSelectedId(isSelected ? null : deadline.id);
                       }}
                       className={cn(
-                        "w-full rounded-lg bg-white p-3 text-left shadow-sm ring-2 transition hover:shadow-md",
+                        "relative w-full rounded-lg bg-white p-3 text-left shadow-sm ring-2 transition hover:shadow-md",
                         isSelected ? "ring-amber-400" : "ring-transparent hover:ring-amber-200",
                       )}
                     >
+                      {isSelected && (
+                        <span className="absolute right-2 top-2 rounded p-0.5 text-stone-400 hover:text-stone-600">
+                          <X size={14} />
+                        </span>
+                      )}
                       <Badge tone={deadline.eventType === "academic" ? "amber" : "neutral"}>{workloadLabel(deadline)}</Badge>
                       <p className="mt-2 text-sm font-semibold">{deadline.title}</p>
                       <p className="mt-1 text-xs text-stone-500">{deadline.time}</p>
-                      <p className="mt-3 flex items-center gap-1 text-xs font-medium text-amber-700">
-                        <Pencil size={11} />
-                        {isSelected ? "Close" : "Edit details"}
-                      </p>
+                      {!isSelected && (
+                        <p className="mt-3 flex items-center gap-1 text-xs font-medium text-amber-700">
+                          <Pencil size={11} />
+                          Edit details
+                        </p>
+                      )}
                     </button>
                   );
                 })}

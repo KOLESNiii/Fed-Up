@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarPlus, Pencil, X, Minus, Plus } from "lucide-react";
+import { CalendarPlus, Pencil, Trash2, X, Minus, Plus } from "lucide-react";
 import type { Deadline, Screen } from "../types";
 import { AppButton, Badge } from "../components/primitives";
 import { Input } from "@/components/ui/input";
@@ -10,18 +10,26 @@ import type { TrackPrototypeEvent } from "../analytics";
 
 const urgencyLevels: Deadline["urgency"][] = ["low", "medium", "high"];
 const urgencyLabel: Record<Deadline["urgency"], string> = { low: "Low", medium: "Medium", high: "High" };
+const timePattern = /^([01]?\d|2[0-3]):[0-5]\d$/;
 
 type WorkloadDraft = {
   day: string;
   title: string;
   time: string;
-  urgency: Deadline["urgency"];
+  urgency: Deadline["urgency"] | null;
   effortHours: number;
 };
 
-function DeadlineEditPanel({ deadline, onUpdate, onClose }: {
+type FormErrors = {
+  title?: string;
+  time?: string;
+  urgency?: string;
+};
+
+function DeadlineEditPanel({ deadline, onUpdate, onDelete, onClose }: {
   deadline: Deadline;
   onUpdate: (patch: Partial<Deadline>) => void;
+  onDelete: () => void;
   onClose: () => void;
 }) {
   return (
@@ -38,7 +46,6 @@ function DeadlineEditPanel({ deadline, onUpdate, onClose }: {
       </div>
 
       <div className="grid gap-6 sm:grid-cols-3">
-        {/* Event type */}
         <div>
           <p className="mb-2 text-sm font-semibold text-stone-700">Event type</p>
           <div className="flex gap-2">
@@ -58,12 +65,9 @@ function DeadlineEditPanel({ deadline, onUpdate, onClose }: {
               </button>
             ))}
           </div>
-          <p className="mt-1.5 text-xs text-stone-400">
-            Academic events affect how much cooking effort Autopilot assigns.
-          </p>
+          <p className="mt-1.5 text-xs text-stone-400">Academic events affect how much cooking effort Autopilot assigns.</p>
         </div>
 
-        {/* Estimated effort */}
         <div>
           <p className="mb-2 text-sm font-semibold text-stone-700">Estimated effort</p>
           <div className="flex items-center gap-3">
@@ -75,9 +79,7 @@ function DeadlineEditPanel({ deadline, onUpdate, onClose }: {
             >
               <Minus size={14} />
             </button>
-            <span className="min-w-[3.5rem] text-center text-lg font-semibold text-stone-900">
-              {deadline.effortHours}h
-            </span>
+            <span className="min-w-[3.5rem] text-center text-lg font-semibold text-stone-900">{deadline.effortHours}h</span>
             <button
               type="button"
               onClick={() => onUpdate({ effortHours: Math.min(12, deadline.effortHours + 1) })}
@@ -90,7 +92,6 @@ function DeadlineEditPanel({ deadline, onUpdate, onClose }: {
           <p className="mt-1.5 text-xs text-stone-400">How many hours this event needs from you.</p>
         </div>
 
-        {/* Urgency */}
         <div>
           <p className="mb-2 text-sm font-semibold text-stone-700">Urgency</p>
           <div className="flex gap-2">
@@ -120,9 +121,14 @@ function DeadlineEditPanel({ deadline, onUpdate, onClose }: {
 
       <div className="mt-5 flex items-center justify-between gap-4">
         <p className="text-sm text-stone-500">{cookingEffortReason(deadline)}</p>
-        <AppButton variant="primary" onClick={onClose} className="shrink-0">
-          Done
-        </AppButton>
+        <div className="flex gap-2">
+          <AppButton type="button" variant="danger" onClick={onDelete} className="shrink-0">
+            <Trash2 size={15} /> Delete
+          </AppButton>
+          <AppButton variant="primary" onClick={onClose} className="shrink-0">
+            Done
+          </AppButton>
+        </div>
       </div>
     </div>
   );
@@ -141,47 +147,65 @@ export function CalendarScreen({
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<WorkloadDraft | null>(null);
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
   const selectedDeadline = deadlines.find((d) => d.id === selectedId) ?? null;
 
   function updateDeadline(id: string, patch: Partial<Deadline>) {
-    setDeadlines(deadlines.map((deadline) => (deadline.id === id ? { ...deadline, ...patch, confirmed: true } : deadline)));
+    setDeadlines(deadlines.map((d) => (d.id === id ? { ...d, ...patch, confirmed: true } : d)));
     track("calendar_workload_updated", { deadline_id: id, fields: Object.keys(patch) });
+  }
+
+  function deleteDeadline(id: string) {
+    setDeadlines(deadlines.filter((d) => d.id !== id));
+    setSelectedId(null);
+    track("calendar_workload_deleted", { deadline_id: id });
   }
 
   function startManualWorkload(day: string) {
     setSelectedId(null);
-    setDraft({
-      day,
-      title: "",
-      time: "17:00",
-      urgency: "medium",
-      effortHours: 3,
-    });
+    setFormErrors({});
+    setDraft({ day, title: "", time: "", urgency: null, effortHours: 3 });
     track("calendar_manual_workload_started", { day });
   }
 
   function saveManualWorkload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!draft) return;
 
-    if (!draft) {
+    const errors: FormErrors = {};
+    if (!draft.title.trim()) {
+      errors.title = "Title is required.";
+    }
+    if (!draft.time.trim()) {
+      errors.time = "Time is required.";
+    } else if (!timePattern.test(draft.time.trim())) {
+      errors.time = "Enter a time in HH:MM format, e.g. 14:30.";
+    }
+    if (!draft.urgency) {
+      errors.urgency = "Select an urgency level.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
       return;
     }
 
     const nextDeadline: Deadline = {
       id: `manual-${Date.now()}`,
-      title: draft.title.trim() || "Academic workload",
+      title: draft.title.trim(),
       date: draft.day,
-      time: draft.time.trim() || "All day",
-      intensity: urgencyLabel[draft.urgency],
+      time: draft.time.trim(),
+      intensity: urgencyLabel[draft.urgency!],
       eventType: "academic",
       effortHours: draft.effortHours,
-      urgency: draft.urgency,
+      urgency: draft.urgency!,
       confirmed: true,
     };
 
     setDeadlines([...deadlines, nextDeadline]);
     setSelectedId(nextDeadline.id);
     setDraft(null);
+    setFormErrors({});
     track("calendar_manual_workload_added", {
       day: nextDeadline.date,
       urgency: nextDeadline.urgency,
@@ -208,96 +232,120 @@ export function CalendarScreen({
 
       <div className="grid gap-4 md:grid-cols-5">
         {days.map((day) => {
-          const deadline = deadlines.find((entry) => entry.date === day || entry.date.includes(day.split(" ")[0] ?? ""));
-          const isSelected = deadline?.id === selectedId;
+          const dayDeadlines = deadlines.filter((entry) => entry.date === day || entry.date.includes(day.split(" ")[0] ?? ""));
+          const isDraftDay = draft?.day === day;
 
           return (
-            <div key={day} className={cn("min-h-52 rounded-lg border p-4 transition", deadline ? "border-amber-200 bg-amber-50" : "border-stone-200 bg-white")}>
+            <div key={day} className={cn("min-h-52 rounded-lg border p-4 transition", dayDeadlines.length > 0 ? "border-amber-200 bg-amber-50" : "border-stone-200 bg-white")}>
               <p className="text-sm font-semibold">{day}</p>
-              {deadline ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDraft(null);
-                    setSelectedId(isSelected ? null : deadline.id);
-                  }}
-                  className={cn(
-                    "mt-5 w-full rounded-lg bg-white p-3 text-left shadow-sm ring-2 transition hover:shadow-md",
-                    isSelected ? "ring-amber-400" : "ring-transparent hover:ring-amber-200",
-                  )}
-                >
-                  <Badge tone={deadline.eventType === "academic" ? "amber" : "neutral"}>{workloadLabel(deadline)}</Badge>
-                  <p className="mt-2 text-sm font-semibold">{deadline.title}</p>
-                  <p className="mt-1 text-xs text-stone-500">{deadline.time}</p>
-                  <p className="mt-3 flex items-center gap-1 text-xs font-medium text-amber-700">
-                    <Pencil size={11} />
-                    {isSelected ? "Close" : "Edit details"}
-                  </p>
-                </button>
-              ) : (
+              <div className="mt-3 space-y-2">
+                {dayDeadlines.map((deadline) => {
+                  const isSelected = deadline.id === selectedId;
+                  return (
+                    <button
+                      key={deadline.id}
+                      type="button"
+                      onClick={() => {
+                        setDraft(null);
+                        setFormErrors({});
+                        setSelectedId(isSelected ? null : deadline.id);
+                      }}
+                      className={cn(
+                        "w-full rounded-lg bg-white p-3 text-left shadow-sm ring-2 transition hover:shadow-md",
+                        isSelected ? "ring-amber-400" : "ring-transparent hover:ring-amber-200",
+                      )}
+                    >
+                      <Badge tone={deadline.eventType === "academic" ? "amber" : "neutral"}>{workloadLabel(deadline)}</Badge>
+                      <p className="mt-2 text-sm font-semibold">{deadline.title}</p>
+                      <p className="mt-1 text-xs text-stone-500">{deadline.time}</p>
+                      <p className="mt-3 flex items-center gap-1 text-xs font-medium text-amber-700">
+                        <Pencil size={11} />
+                        {isSelected ? "Close" : "Edit details"}
+                      </p>
+                    </button>
+                  );
+                })}
                 <button
                   type="button"
                   onClick={() => startManualWorkload(day)}
                   className={cn(
-                    "mt-5 flex min-h-32 w-full flex-col items-center justify-center rounded-lg border border-dashed p-4 text-center text-sm transition",
-                    draft?.day === day
+                    "flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition",
+                    dayDeadlines.length === 0 ? "min-h-32 flex-col p-4 text-sm" : "p-2 text-xs",
+                    isDraftDay
                       ? "border-emerald-400 bg-emerald-50 text-emerald-800"
-                      : "border-stone-300 bg-stone-50 text-stone-500 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800",
+                      : "border-stone-300 text-stone-400 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700",
                   )}
                 >
-                  <CalendarPlus size={22} />
-                  <span className="mt-2 font-semibold">Add workload</span>
-                  <span className="mt-1 text-xs">Deadline, exam or heavy study block</span>
+                  <CalendarPlus size={dayDeadlines.length === 0 ? 22 : 14} />
+                  {dayDeadlines.length === 0 ? (
+                    <>
+                      <span className="font-semibold">Add workload</span>
+                      <span className="text-xs">Deadline, exam or heavy study block</span>
+                    </>
+                  ) : (
+                    <span className="font-medium">Add another</span>
+                  )}
                 </button>
-              )}
+              </div>
             </div>
           );
         })}
       </div>
 
       {draft && (
-        <form onSubmit={saveManualWorkload} className="mt-4 rounded-xl border border-emerald-200 bg-white p-6 shadow-md">
+        <form onSubmit={saveManualWorkload} noValidate className="mt-4 rounded-xl border border-emerald-200 bg-white p-6 shadow-md">
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-stone-400">New academic workload</p>
               <h2 className="mt-1 text-xl font-bold text-stone-950">{draft.day}</h2>
               <p className="mt-1 text-sm text-stone-500">Add anything Autopilot missed so cooking effort can adapt around it.</p>
             </div>
-            <button type="button" onClick={() => setDraft(null)} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" aria-label="Close workload form">
+            <button
+              type="button"
+              onClick={() => { setDraft(null); setFormErrors({}); }}
+              className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+              aria-label="Close workload form"
+            >
               <X size={16} />
             </button>
           </div>
 
           <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_140px]">
-            <label className="block">
-              <span className="text-sm font-semibold text-stone-700">Title</span>
-              <Input
-                value={draft.title}
-                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-                placeholder="e.g. Operating Systems coursework"
-                className="mt-2 h-auto rounded-lg border-stone-200 bg-white p-3"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-semibold text-stone-700">Time</span>
-              <Input
-                value={draft.time}
-                onChange={(event) => setDraft({ ...draft, time: event.target.value })}
-                placeholder="17:00"
-                className="mt-2 h-auto rounded-lg border-stone-200 bg-white p-3"
-              />
-            </label>
+            <div>
+              <label className="block">
+                <span className="text-sm font-semibold text-stone-700">Title <span className="text-rose-500">*</span></span>
+                <Input
+                  value={draft.title}
+                  onChange={(e) => { setDraft({ ...draft, title: e.target.value }); setFormErrors((err) => ({ ...err, title: undefined })); }}
+                  placeholder="e.g. Operating Systems coursework"
+                  className={cn("mt-2 h-auto rounded-lg border-stone-200 bg-white p-3", formErrors.title && "border-rose-400")}
+                />
+              </label>
+              {formErrors.title && <p className="mt-1 text-xs text-rose-600">{formErrors.title}</p>}
+            </div>
+            <div>
+              <label className="block">
+                <span className="text-sm font-semibold text-stone-700">Time <span className="text-rose-500">*</span></span>
+                <Input
+                  value={draft.time}
+                  onChange={(e) => { setDraft({ ...draft, time: e.target.value }); setFormErrors((err) => ({ ...err, time: undefined })); }}
+                  placeholder="14:30"
+                  className={cn("mt-2 h-auto rounded-lg border-stone-200 bg-white p-3", formErrors.time && "border-rose-400")}
+                />
+              </label>
+              {formErrors.time && <p className="mt-1 text-xs text-rose-600">{formErrors.time}</p>}
+            </div>
           </div>
 
           <div className="mt-5 grid gap-6 sm:grid-cols-2">
             <div>
-              <p className="mb-2 text-sm font-semibold text-stone-700">Urgency</p>
+              <p className="mb-2 text-sm font-semibold text-stone-700">Urgency <span className="text-rose-500">*</span></p>
               <div className="flex gap-2">
                 {urgencyLevels.map((level) => (
                   <button
                     key={level}
                     type="button"
-                    onClick={() => setDraft({ ...draft, urgency: level })}
+                    onClick={() => { setDraft({ ...draft, urgency: level }); setFormErrors((err) => ({ ...err, urgency: undefined })); }}
                     className={cn(
                       "flex-1 rounded-lg border py-2 text-sm font-medium transition",
                       draft.urgency === level
@@ -306,13 +354,16 @@ export function CalendarScreen({
                           : level === "medium"
                             ? "border-amber-400 bg-amber-50 text-amber-800"
                             : "border-emerald-400 bg-emerald-50 text-emerald-800"
-                        : "border-stone-200 bg-white text-stone-500 hover:bg-stone-50",
+                        : formErrors.urgency
+                          ? "border-rose-200 bg-white text-stone-500 hover:bg-stone-50"
+                          : "border-stone-200 bg-white text-stone-500 hover:bg-stone-50",
                     )}
                   >
                     {urgencyLabel[level]}
                   </button>
                 ))}
               </div>
+              {formErrors.urgency && <p className="mt-1 text-xs text-rose-600">{formErrors.urgency}</p>}
             </div>
 
             <div>
@@ -326,9 +377,7 @@ export function CalendarScreen({
                 >
                   <Minus size={14} />
                 </button>
-                <span className="min-w-[3.5rem] text-center text-lg font-semibold text-stone-900">
-                  {draft.effortHours}h
-                </span>
+                <span className="min-w-[3.5rem] text-center text-lg font-semibold text-stone-900">{draft.effortHours}h</span>
                 <button
                   type="button"
                   onClick={() => setDraft({ ...draft, effortHours: Math.min(12, draft.effortHours + 1) })}
@@ -342,7 +391,7 @@ export function CalendarScreen({
           </div>
 
           <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <AppButton type="button" variant="secondary" onClick={() => setDraft(null)} className="justify-center">
+            <AppButton type="button" variant="secondary" onClick={() => { setDraft(null); setFormErrors({}); }} className="justify-center">
               Cancel
             </AppButton>
             <AppButton type="submit" className="justify-center">
@@ -356,6 +405,7 @@ export function CalendarScreen({
         <DeadlineEditPanel
           deadline={selectedDeadline}
           onUpdate={(patch) => updateDeadline(selectedDeadline.id, patch)}
+          onDelete={() => deleteDeadline(selectedDeadline.id)}
           onClose={() => setSelectedId(null)}
         />
       )}

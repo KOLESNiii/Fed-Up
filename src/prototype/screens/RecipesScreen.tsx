@@ -2,12 +2,45 @@ import { Plus, RefreshCcw, UtensilsCrossed } from "lucide-react";
 import { useState } from "react";
 
 import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import type { Meal, NutritionSource } from "../types";
 import { AppButton, Field } from "../components/primitives";
 import { formatIngredient, parseIngredients } from "../ingredients";
 import { fetchOpenFoodFactsNutrition } from "../nutritionApi";
-import { money } from "../utils";
+import { money, nutritionSourceSummary } from "../utils";
 import type { TrackPrototypeEvent } from "../analytics";
+
+type CreateForm = {
+  name: string;
+  minutes: number;
+  price: number;
+  ingredients: string;
+  tags: string;
+  allergens: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  nutritionSource?: NutritionSource;
+  instructions: string;
+  note: string;
+};
+
+const defaultForm: CreateForm = {
+  name: "",
+  minutes: 10,
+  price: 2.5,
+  ingredients: "",
+  tags: "",
+  allergens: "",
+  calories: 500,
+  protein: 20,
+  carbs: 60,
+  fat: 15,
+  nutritionSource: undefined,
+  instructions: "",
+  note: "",
+};
 
 export function RecipesScreen({
   customRecipes,
@@ -20,10 +53,9 @@ export function RecipesScreen({
   onSelectMeal: (mealId: string) => void;
   track: TrackPrototypeEvent;
 }) {
-  const [form, setForm] = useState({ name: "", minutes: 10, price: 2.5, ingredients: "", tags: "" });
+  const [form, setForm] = useState<CreateForm>(defaultForm);
   const [nutritionLoading, setNutritionLoading] = useState(false);
   const [nutritionStatus, setNutritionStatus] = useState<string | null>(null);
-  const [fetchedNutrition, setFetchedNutrition] = useState<{ calories: number; protein: number; carbs: number; fat: number; source?: NutritionSource } | null>(null);
 
   async function estimateNutrition() {
     const ingredients = parseIngredients(form.ingredients);
@@ -38,7 +70,14 @@ export function RecipesScreen({
 
     try {
       const nutrition = await fetchOpenFoodFactsNutrition(ingredients);
-      setFetchedNutrition(nutrition);
+      setForm((prev) => ({
+        ...prev,
+        calories: nutrition.calories,
+        protein: nutrition.protein,
+        carbs: nutrition.carbs,
+        fat: nutrition.fat,
+        nutritionSource: nutrition.source,
+      }));
       const missing = nutrition.source?.missingIngredients ?? [];
       setNutritionStatus(missing.length > 0 ? `Couldn't find: ${missing.join(", ")}` : "All ingredients matched");
       track("recipe_nutrition_refreshed", {
@@ -57,31 +96,42 @@ export function RecipesScreen({
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!form.name.trim()) {
-      return;
-    }
+    if (!form.name.trim()) return;
+
+    const ingredients = parseIngredients(form.ingredients);
+    const tags = form.tags.split(",").map((v) => v.trim()).filter(Boolean);
+    const allergens = form.allergens.split(",").map((v) => v.trim()).filter(Boolean);
+    const instructions = form.instructions
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
     const nextRecipe = {
       id: `custom-${Date.now()}`,
-        name: form.name,
-        type: "cook",
-        mealSlots: ["lunch", "dinner"],
-        time: +form.minutes,
-        price: +form.price,
-        ingredients: parseIngredients(form.ingredients),
-        tags: form.tags
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean),
-        allergens: [],
-        nutrition: fetchedNutrition ?? { calories: 500, protein: 20, carbs: 60, fat: 15 },
-        rating: 0,
-        reviews: [],
-        instructions: ["Prepare the ingredients.", "Cook or assemble the meal.", "Taste and adjust seasoning."],
-        source: "My recipes",
-        note: "Added by you",
-        image: "🍽️",
-      } satisfies Meal;
+      name: form.name.trim(),
+      type: "cook",
+      mealSlots: ["lunch", "dinner"],
+      time: Number(form.minutes) || 0,
+      price: Number(form.price) || 0,
+      ingredients,
+      tags,
+      allergens,
+      nutrition: {
+        calories: Number(form.calories) || 0,
+        protein: Number(form.protein) || 0,
+        carbs: Number(form.carbs) || 0,
+        fat: Number(form.fat) || 0,
+        source: form.nutritionSource,
+      },
+      rating: 0,
+      reviews: [],
+      instructions: instructions.length > 0
+        ? instructions
+        : ["Prepare the ingredients.", "Cook or assemble the meal.", "Taste and adjust seasoning."],
+      source: "My recipes",
+      note: form.note.trim() || "Added by you",
+      image: "🍽️",
+    } satisfies Meal;
 
     setCustomRecipes([nextRecipe, ...customRecipes]);
     track("custom_recipe_added", {
@@ -91,8 +141,7 @@ export function RecipesScreen({
       ingredient_count: nextRecipe.ingredients.length,
       tag_count: nextRecipe.tags.length,
     });
-    setForm({ name: "", minutes: 10, price: 2.5, ingredients: "", tags: "" });
-    setFetchedNutrition(null);
+    setForm(defaultForm);
     setNutritionStatus(null);
   }
 
@@ -114,35 +163,32 @@ export function RecipesScreen({
               </div>
               <Field label="Ingredients with quantities" value={form.ingredients} onChange={(ingredients) => setForm({ ...form, ingredients })} placeholder="120g beans, 1 wrap, 50g tomato" />
               <Field label="Tags" value={form.tags} onChange={(tags) => setForm({ ...form, tags })} placeholder="vegetarian, microwave" />
+              <Field label="Allergens" value={form.allergens} onChange={(allergens) => setForm({ ...form, allergens })} placeholder="gluten, dairy" />
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-stone-50 p-3">
                 <div>
-                  <p className="text-sm font-semibold">Nutrition estimate</p>
-                  <p className="mt-0.5 text-xs text-stone-500">{nutritionStatus ?? (fetchedNutrition ? "Fetched from OpenFoodFacts" : "Optional — pull from OpenFoodFacts")}</p>
+                  <p className="text-sm font-semibold">Nutrition data</p>
+                  <p className="mt-1 text-xs text-stone-500">{nutritionStatus ?? nutritionSourceSummary(form.nutritionSource)}</p>
                 </div>
                 <AppButton type="button" variant="secondary" onClick={estimateNutrition} disabled={nutritionLoading}>
-                  <RefreshCcw size={16} /> {nutritionLoading ? "Checking..." : "Estimate nutrition"}
+                  <RefreshCcw size={16} /> {nutritionLoading ? "Checking..." : "Pull from OpenFoodFacts"}
                 </AppButton>
               </div>
-              {fetchedNutrition && (
-                <div className="grid grid-cols-4 gap-2 text-center text-sm">
-                  <div className="rounded-lg bg-stone-50 p-2">
-                    <p className="font-semibold">{fetchedNutrition.calories}</p>
-                    <p className="text-xs text-stone-500">kcal</p>
-                  </div>
-                  <div className="rounded-lg bg-stone-50 p-2">
-                    <p className="font-semibold">{fetchedNutrition.protein}g</p>
-                    <p className="text-xs text-stone-500">protein</p>
-                  </div>
-                  <div className="rounded-lg bg-stone-50 p-2">
-                    <p className="font-semibold">{fetchedNutrition.carbs}g</p>
-                    <p className="text-xs text-stone-500">carbs</p>
-                  </div>
-                  <div className="rounded-lg bg-stone-50 p-2">
-                    <p className="font-semibold">{fetchedNutrition.fat}g</p>
-                    <p className="text-xs text-stone-500">fat</p>
-                  </div>
-                </div>
-              )}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Field label="Calories" type="number" value={form.calories} onChange={(calories) => setForm({ ...form, calories: +calories })} />
+                <Field label="Protein (g)" type="number" value={form.protein} onChange={(protein) => setForm({ ...form, protein: +protein })} />
+                <Field label="Carbs (g)" type="number" value={form.carbs} onChange={(carbs) => setForm({ ...form, carbs: +carbs })} />
+                <Field label="Fat (g)" type="number" value={form.fat} onChange={(fat) => setForm({ ...form, fat: +fat })} />
+              </div>
+              <label className="block">
+                <span className="text-sm font-semibold">Method</span>
+                <Textarea
+                  value={form.instructions}
+                  onChange={(e) => setForm({ ...form, instructions: e.target.value })}
+                  className="mt-2 min-h-36 rounded-lg border-stone-200 bg-white"
+                  placeholder={"Step 1\nStep 2\nStep 3"}
+                />
+              </label>
+              <Field label="Notes" value={form.note} onChange={(note) => setForm({ ...form, note })} placeholder="Any tips or variations" />
             </div>
             <AppButton type="submit" className="mt-6 w-full">
               <Plus size={16} /> Add recipe
@@ -167,7 +213,7 @@ export function RecipesScreen({
                     <p className="font-medium text-emerald-700">{money(recipe.price)}</p>
                   </div>
                   <p className="mt-2 text-sm text-stone-500">
-                    {recipe.time} minutes - {recipe.ingredients.map(formatIngredient).join(", ")}
+                    {recipe.time} minutes · {recipe.ingredients.map(formatIngredient).join(", ")}
                   </p>
                 </button>
               ))

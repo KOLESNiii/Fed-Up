@@ -8,7 +8,7 @@ import { fetchOpenFoodFactsNutrition } from "../nutritionApi";
 import type { Meal, NutritionSource, Screen } from "../types";
 import { AppButton, Badge, Field } from "../components/primitives";
 import { formatIngredient, formatIngredientsForEditing, parseIngredients } from "../ingredients";
-import { mealById, money } from "../utils";
+import { mealById, money, nutritionSourceSummary } from "../utils";
 import type { TrackPrototypeEvent } from "../analytics";
 
 type RecipeForm = {
@@ -56,19 +56,6 @@ function ratingLabel(rating: number) {
   return rating > 0 ? `${rating.toFixed(1)} / 5` : "No ratings yet";
 }
 
-function nutritionSourceSummary(source: NutritionSource | undefined) {
-  if (!source) return "Manual estimate";
-
-  const missing = source.missingIngredients ?? [];
-
-  if ((source.matchedIngredients?.length ?? 0) === 0 && missing.length === 0) {
-    return source.label;
-  }
-
-  return missing.length > 0
-    ? `${source.label} · couldn't find: ${missing.join(", ")}`
-    : `${source.label} · all matched`;
-}
 
 export function RecipeDetailScreen({
   mealId,

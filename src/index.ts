@@ -2,10 +2,48 @@ import { serve } from "bun";
 import index from "./index.html";
 import { deadlineBootstrap } from "./data/seededScenario";
 import { seededMeals } from "./data/seededMeals";
+import {
+  estimateIngredientNutrition,
+  totalNutritionFromEstimates,
+  type OpenFoodFactsProduct,
+} from "./prototype/nutrition";
+import type { RecipeIngredient } from "./prototype/types";
 
 const sessionRetentionDays = 90;
 const anonymousSessions = new Map<string, { settings: unknown; updatedAt: string; expiresAt: string }>();
 const sessionIdPattern = /^[A-Za-z0-9_-]{16,80}$/;
+const openFoodFactsUserAgent = "DeadlineFoodPrototype/0.1";
+const freshIngredientSearchHints = new Set([
+  "banana",
+  "berries",
+  "broccoli",
+  "carrot",
+  "courgette",
+  "cucumber",
+  "pepper",
+  "peppers",
+  "salad",
+  "spinach",
+  "tomato",
+  "vegetables",
+]);
+
+type OpenFoodFactsSearchResponse = {
+  products?: OpenFoodFactsProduct[];
+};
+
+function isRecipeIngredient(value: unknown): value is RecipeIngredient {
+  const candidate = value as RecipeIngredient;
+  return (
+    typeof candidate?.name === "string" &&
+    candidate.name.trim().length > 0 &&
+    typeof candidate.quantity === "number" &&
+    Number.isFinite(candidate.quantity) &&
+    candidate.quantity > 0 &&
+    typeof candidate.unit === "string" &&
+    candidate.unit.trim().length > 0
+  );
+}
 
 function sessionResponse(sessionId: string, settings: unknown | null, expiresAt: string | null) {
   return Response.json({
@@ -18,6 +56,35 @@ function sessionResponse(sessionId: string, settings: unknown | null, expiresAt:
 
 function expiresAtFromNow() {
   return new Date(Date.now() + sessionRetentionDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function openFoodFactsSearchTerm(ingredient: RecipeIngredient) {
+  const name = ingredient.name.trim();
+  return freshIngredientSearchHints.has(name.toLowerCase()) ? `${name} fresh` : name;
+}
+
+async function fetchOpenFoodFactsProducts(ingredient: RecipeIngredient) {
+  const url = new URL("https://world.openfoodfacts.org/cgi/search.pl");
+  url.searchParams.set("search_terms", openFoodFactsSearchTerm(ingredient));
+  url.searchParams.set("search_simple", "1");
+  url.searchParams.set("action", "process");
+  url.searchParams.set("json", "1");
+  url.searchParams.set("page_size", "5");
+  url.searchParams.set("fields", "product_name,nutriments,code");
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": openFoodFactsUserAgent,
+    },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const payload = await response.json().catch(() => null) as OpenFoodFactsSearchResponse | null;
+  return payload?.products ?? [];
 }
 
 const server = serve({
@@ -41,6 +108,40 @@ const server = serve({
     "/api/deadline-food/scenario": {
       async GET() {
         return Response.json(deadlineBootstrap.canonicalConstraints);
+      },
+    },
+
+    "/api/deadline-food/nutrition/openfoodfacts": {
+      async POST(req) {
+        const payload = await req.json().catch(() => null) as { ingredients?: unknown } | null;
+        const ingredients = Array.isArray(payload?.ingredients) ? payload.ingredients.filter(isRecipeIngredient) : [];
+
+        if (ingredients.length === 0) {
+          return Response.json({ error: "At least one ingredient with a quantity is required." }, { status: 400 });
+        }
+
+        if (ingredients.length > 12) {
+          return Response.json({ error: "A maximum of 12 ingredients can be checked at once." }, { status: 400 });
+        }
+
+        const lookups = await Promise.all(
+          ingredients.map(async ingredient => {
+            const products = await fetchOpenFoodFactsProducts(ingredient);
+            return products
+              .map((product) => estimateIngredientNutrition(ingredient, product))
+              .find((estimate) => estimate !== null) ?? null;
+          }),
+        );
+        const estimates = lookups.filter((estimate): estimate is NonNullable<typeof estimate> => estimate !== null);
+        const missingIngredients = ingredients
+          .filter((ingredient) => !estimates.some((estimate) => estimate.ingredient.name === ingredient.name))
+          .map((ingredient) => ingredient.name);
+
+        if (estimates.length === 0) {
+          return Response.json({ error: "OpenFoodFacts did not return usable nutrition data for these ingredients." }, { status: 502 });
+        }
+
+        return Response.json(totalNutritionFromEstimates(estimates, missingIngredients));
       },
     },
 

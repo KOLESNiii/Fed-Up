@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import type { Meal } from "../types";
 import { AppButton, Field } from "../components/primitives";
+import { formatIngredient, parseIngredients } from "../ingredients";
 import { money } from "../utils";
 import type { TrackPrototypeEvent } from "../analytics";
 
@@ -34,10 +35,7 @@ export function RecipesScreen({
         mealSlots: ["lunch", "dinner"],
         time: +form.minutes,
         price: +form.price,
-        ingredients: form.ingredients
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean),
+        ingredients: parseIngredients(form.ingredients),
         tags: form.tags
           .split(",")
           .map((value) => value.trim())
@@ -79,7 +77,7 @@ export function RecipesScreen({
                 <Field label="Time (mins)" type="number" value={form.minutes} onChange={(minutes) => setForm({ ...form, minutes: +minutes })} />
                 <Field label="Cost / portion (£)" type="number" step="0.05" value={form.price} onChange={(price) => setForm({ ...form, price: +price })} />
               </div>
-              <Field label="Ingredients" value={form.ingredients} onChange={(ingredients) => setForm({ ...form, ingredients })} placeholder="beans, wrap, tomato" />
+              <Field label="Ingredients with quantities" value={form.ingredients} onChange={(ingredients) => setForm({ ...form, ingredients })} placeholder="120g beans, 1 wrap, 50g tomato" />
               <Field label="Tags" value={form.tags} onChange={(tags) => setForm({ ...form, tags })} placeholder="vegetarian, microwave" />
             </div>
             <AppButton type="submit" className="mt-6 w-full">
@@ -105,7 +103,7 @@ export function RecipesScreen({
                     <p className="font-medium text-emerald-700">{money(recipe.price)}</p>
                   </div>
                   <p className="mt-2 text-sm text-stone-500">
-                    {recipe.time} minutes - {recipe.ingredients.join(", ")}
+                    {recipe.time} minutes - {recipe.ingredients.map(formatIngredient).join(", ")}
                   </p>
                 </button>
               ))

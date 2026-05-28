@@ -1,11 +1,13 @@
-import { ArrowLeft, MessageSquare, Pencil, Save, X } from "lucide-react";
+import { ArrowLeft, MessageSquare, Pencil, RefreshCcw, Save, X } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { seedMeals } from "../data";
-import type { Meal, Screen } from "../types";
+import { fetchOpenFoodFactsNutrition } from "../nutritionApi";
+import type { Meal, NutritionSource, Screen } from "../types";
 import { AppButton, Badge, Field } from "../components/primitives";
+import { formatIngredient, formatIngredientsForEditing, parseIngredients } from "../ingredients";
 import { mealById, money } from "../utils";
 import type { TrackPrototypeEvent } from "../analytics";
 
@@ -20,6 +22,7 @@ type RecipeForm = {
   protein: number;
   carbs: number;
   fat: number;
+  nutritionSource?: NutritionSource;
   instructions: string;
   note: string;
 };
@@ -29,13 +32,14 @@ function mealToForm(meal: Meal): RecipeForm {
     name: meal.name,
     time: meal.time,
     price: meal.price,
-    ingredients: meal.ingredients.join(", "),
+    ingredients: formatIngredientsForEditing(meal.ingredients),
     tags: meal.tags.join(", "),
     allergens: meal.allergens.join(", "),
     calories: meal.nutrition.calories,
     protein: meal.nutrition.protein,
     carbs: meal.nutrition.carbs,
     fat: meal.nutrition.fat,
+    nutritionSource: meal.nutrition.source,
     instructions: meal.instructions.join("\n"),
     note: meal.note,
   };
@@ -50,6 +54,21 @@ function splitList(value: string) {
 
 function ratingLabel(rating: number) {
   return rating > 0 ? `${rating.toFixed(1)} / 5` : "No ratings yet";
+}
+
+function nutritionSourceSummary(source: NutritionSource | undefined) {
+  if (!source) {
+    return "Manual estimate";
+  }
+
+  const matchedCount = source.matchedIngredients?.length ?? 0;
+  const missingCount = source.missingIngredients?.length ?? 0;
+
+  if (matchedCount === 0 && missingCount === 0) {
+    return source.label;
+  }
+
+  return `${source.label} - ${matchedCount} matched${missingCount > 0 ? `, ${missingCount} missing` : ""}`;
 }
 
 export function RecipeDetailScreen({
@@ -70,6 +89,8 @@ export function RecipeDetailScreen({
   const [form, setForm] = useState<RecipeForm>(() => mealToForm(meal ?? fallbackMeal));
   const [review, setReview] = useState({ author: "You", rating: 5, comment: "" });
   const [isEditing, setIsEditing] = useState(false);
+  const [nutritionStatus, setNutritionStatus] = useState<string | null>(null);
+  const [nutritionLoading, setNutritionLoading] = useState(false);
 
   const computedRating = useMemo(() => {
     if (!meal || meal.reviews.length === 0) {
@@ -104,7 +125,7 @@ export function RecipeDetailScreen({
       name: form.name.trim() || selectedMeal.name,
       time: Number(form.time) || 0,
       price: Number(form.price) || 0,
-      ingredients: splitList(form.ingredients),
+      ingredients: parseIngredients(form.ingredients),
       tags: splitList(form.tags),
       allergens: splitList(form.allergens),
       nutrition: {
@@ -112,6 +133,7 @@ export function RecipeDetailScreen({
         protein: Number(form.protein) || 0,
         carbs: Number(form.carbs) || 0,
         fat: Number(form.fat) || 0,
+        source: form.nutritionSource,
       },
       instructions: form.instructions
         .split("\n")
@@ -123,15 +145,52 @@ export function RecipeDetailScreen({
       meal_id: selectedMeal.id,
       minutes: Number(form.time) || 0,
       price: Number(form.price) || 0,
-      ingredient_count: splitList(form.ingredients).length,
+      ingredient_count: parseIngredients(form.ingredients).length,
       tag_count: splitList(form.tags).length,
     });
     setIsEditing(false);
   }
 
+  async function refreshNutrition() {
+    const ingredients = parseIngredients(form.ingredients);
+
+    if (ingredients.length === 0) {
+      setNutritionStatus("Add at least one ingredient with a quantity first.");
+      return;
+    }
+
+    setNutritionLoading(true);
+    setNutritionStatus(null);
+
+    try {
+      const nutrition = await fetchOpenFoodFactsNutrition(ingredients);
+      setForm({
+        ...form,
+        calories: nutrition.calories,
+        protein: nutrition.protein,
+        carbs: nutrition.carbs,
+        fat: nutrition.fat,
+        nutritionSource: nutrition.source,
+      });
+      setNutritionStatus(nutritionSourceSummary(nutrition.source));
+      track("recipe_nutrition_refreshed", {
+        meal_id: selectedMeal.id,
+        provider: nutrition.source?.provider,
+        ingredient_count: ingredients.length,
+        matched_count: nutrition.source?.matchedIngredients?.length ?? 0,
+        missing_count: nutrition.source?.missingIngredients?.length ?? 0,
+      });
+    } catch (error) {
+      setNutritionStatus(error instanceof Error ? error.message : "Nutrition data could not be loaded.");
+    } finally {
+      setNutritionLoading(false);
+    }
+  }
+
   function cancelEdit() {
     track("recipe_edit_cancelled", { meal_id: selectedMeal.id });
     setForm(mealToForm(selectedMeal));
+    setNutritionStatus(null);
     setIsEditing(false);
   }
 
@@ -190,9 +249,18 @@ export function RecipeDetailScreen({
               <Field label="Time (mins)" type="number" value={form.time} onChange={(time) => setForm({ ...form, time: +time })} />
               <Field label="Cost / portion (£)" type="number" step="0.05" value={form.price} onChange={(price) => setForm({ ...form, price: +price })} />
             </div>
-            <Field label="Ingredients" value={form.ingredients} onChange={(ingredients) => setForm({ ...form, ingredients })} />
+            <Field label="Ingredients with quantities" value={form.ingredients} onChange={(ingredients) => setForm({ ...form, ingredients })} placeholder="50g oats, 150ml oat milk, 80g berries" />
             <Field label="Tags" value={form.tags} onChange={(tags) => setForm({ ...form, tags })} />
             <Field label="Allergens" value={form.allergens} onChange={(allergensValue) => setForm({ ...form, allergens: allergensValue })} />
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-stone-50 p-3">
+              <div>
+                <p className="text-sm font-semibold">Nutrition data</p>
+                <p className="mt-1 text-xs text-stone-500">{nutritionStatus ?? nutritionSourceSummary(form.nutritionSource)}</p>
+              </div>
+              <AppButton type="button" variant="secondary" onClick={refreshNutrition} disabled={nutritionLoading}>
+                <RefreshCcw size={16} /> {nutritionLoading ? "Checking..." : "Pull from OpenFoodFacts"}
+              </AppButton>
+            </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Field label="Calories" type="number" value={form.calories} onChange={(calories) => setForm({ ...form, calories: +calories })} />
               <Field label="Protein (g)" type="number" value={form.protein} onChange={(protein) => setForm({ ...form, protein: +protein })} />
@@ -232,6 +300,7 @@ export function RecipeDetailScreen({
               </div>
               <div className="rounded-lg bg-stone-50 p-4">
                 <h2 className="font-bold">Nutrition</h2>
+                <p className="mt-1 text-xs text-stone-500">{nutritionSourceSummary(meal.nutrition.source)}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                   <p>{meal.nutrition.calories} kcal</p>
                   <p>{meal.nutrition.protein}g protein</p>
@@ -271,8 +340,8 @@ export function RecipeDetailScreen({
                   <h2 className="text-xl font-bold">Ingredients</h2>
                   <ul className="mt-4 grid gap-2">
                     {meal.ingredients.map((ingredient) => (
-                      <li key={ingredient} className="rounded-lg bg-stone-50 px-3 py-2 text-stone-700">
-                        {ingredient}
+                      <li key={`${ingredient.name}-${ingredient.quantity}-${ingredient.unit}`} className="rounded-lg bg-stone-50 px-3 py-2 text-stone-700">
+                        {formatIngredient(ingredient)}
                       </li>
                     ))}
                   </ul>

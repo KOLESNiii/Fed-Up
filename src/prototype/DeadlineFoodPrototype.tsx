@@ -24,6 +24,8 @@ import { SettingsScreen } from "./screens/SettingsScreen";
 const screens: Screen[] = ["landing", "onboarding", "dashboard", "calendar", "plan", "discover", "recipes", "settings", "recipe-detail"];
 
 function screenFromHash(): Screen | null {
+  if (typeof window === "undefined") return null;
+
   const value = window.location.hash.replace("#/", "") as Screen;
   return screens.includes(value) ? value : null;
 }
@@ -47,7 +49,7 @@ export function DeadlineFoodPrototype() {
   const posthog = usePostHog();
   const [sessionId] = useState(() => getOrCreateAnonymousSessionId());
   const [sessionLoaded, setSessionLoaded] = useState(false);
-  const [screen, setScreen] = useState<Screen>("landing");
+  const [screen, setScreen] = useState<Screen>(() => screenFromHash() ?? "landing");
   const [onboarded, setOnboarded] = useState(false);
   const [deadlines, setDeadlines] = useState<Deadline[]>(defaultDeadlines);
   const [prefs, setPrefs] = useState<Preferences>(initialPreferences);
@@ -73,11 +75,6 @@ export function DeadlineFoodPrototype() {
   }, [posthog, sessionId]);
 
   useEffect(() => {
-    const initialScreen = screenFromHash();
-    if (initialScreen) {
-      setScreen(initialScreen);
-    }
-
     function onHashChange() {
       const nextScreen = screenFromHash();
       if (nextScreen) {

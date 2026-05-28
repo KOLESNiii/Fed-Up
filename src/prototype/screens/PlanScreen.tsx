@@ -1,12 +1,14 @@
 import { ArrowLeft, Clock3, Heart, RefreshCcw, X } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Card } from "@/components/ui/card";
 import { mealSlots, seedMeals } from "../data";
 import type { Meal, MealSlot, PlanEntry, Preferences, Screen } from "../types";
 import { BudgetCard } from "../components/BudgetCard";
+import { ShoppingListCard } from "../components/ShoppingListCard";
 import { AppButton, Badge } from "../components/primitives";
 import { ingredientName } from "../ingredients";
+import { groceryVendorById, groceryVendors, ingredientsFromPlan } from "../shopping";
 import { getMealById, money } from "../utils";
 import { mealHealthSignals, weeklyBalanceSummary } from "../healthSignals";
 import type { TrackPrototypeEvent } from "../analytics";
@@ -41,6 +43,8 @@ export function PlanScreen({
 }) {
   const [rescueChoice, setRescueChoice] = useState<RescueChoice>(null);
   const [browseMode, setBrowseMode] = useState(false);
+  const [shoppingVendorId, setShoppingVendorId] = useState(groceryVendors[0].id);
+  const shoppingItems = useMemo(() => ingredientsFromPlan(plan, customRecipes), [plan, customRecipes]);
   const originalDay = rescueChoice ? plan.find((entry) => entry.day === rescueChoice.day) : null;
   const originalPlanMeal = originalDay && rescueChoice ? originalDay.meals.find((meal) => meal.slot === rescueChoice.slot) : null;
   const originalMeal = originalPlanMeal ? getMealById(originalPlanMeal.mealId, customRecipes) : null;
@@ -218,6 +222,22 @@ export function PlanScreen({
             <p className="font-semibold">Weekly balance</p>
             <p className="mt-2 text-sm text-stone-500">{weeklyBalanceSummary(plan, customRecipes)} Signals are broad checks, not calorie targets.</p>
           </Card>
+          <ShoppingListCard
+            title="Shopping list"
+            description="All ingredients across your planned meals for the week."
+            items={shoppingItems}
+            selectedVendor={groceryVendorById(shoppingVendorId)}
+            vendors={groceryVendors}
+            onSelectVendor={setShoppingVendorId}
+            onOpenIngredient={(ingredient) => {
+              track("vendor_shopping_item_opened", { ingredient, vendor: shoppingVendorId, source: "plan" });
+              window.open(groceryVendorById(shoppingVendorId).searchUrl(ingredient), "_blank", "noopener");
+            }}
+            onCopy={() => track("vendor_shopping_list_copied", { vendor: shoppingVendorId, item_count: shoppingItems.length, source: "plan" })}
+            onToggleItem={(ingredient, checked, checkedCount, itemCount) => track("vendor_shopping_item_toggled", { ingredient, checked, checked_count: checkedCount, item_count: itemCount, source: "plan" })}
+            storageKey="deadline-food:plan-shopping-list"
+            compact
+          />
         </div>
       </div>
       {rescueChoice && originalMeal && (

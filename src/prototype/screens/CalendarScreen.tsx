@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Pencil, X, Minus, Plus } from "lucide-react";
+import { CalendarPlus, Pencil, X, Minus, Plus } from "lucide-react";
 import type { Deadline, Screen } from "../types";
 import { AppButton, Badge } from "../components/primitives";
+import { Input } from "@/components/ui/input";
 import { days } from "../data";
 import { cn } from "@/lib/utils";
 import { cookingEffortReason, workloadLabel } from "../workloadModel";
@@ -9,6 +10,14 @@ import type { TrackPrototypeEvent } from "../analytics";
 
 const urgencyLevels: Deadline["urgency"][] = ["low", "medium", "high"];
 const urgencyLabel: Record<Deadline["urgency"], string> = { low: "Low", medium: "Medium", high: "High" };
+
+type WorkloadDraft = {
+  day: string;
+  title: string;
+  time: string;
+  urgency: Deadline["urgency"];
+  effortHours: number;
+};
 
 function DeadlineEditPanel({ deadline, onUpdate, onClose }: {
   deadline: Deadline;
@@ -131,11 +140,53 @@ export function CalendarScreen({
   track: TrackPrototypeEvent;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<WorkloadDraft | null>(null);
   const selectedDeadline = deadlines.find((d) => d.id === selectedId) ?? null;
 
   function updateDeadline(id: string, patch: Partial<Deadline>) {
     setDeadlines(deadlines.map((deadline) => (deadline.id === id ? { ...deadline, ...patch, confirmed: true } : deadline)));
     track("calendar_workload_updated", { deadline_id: id, fields: Object.keys(patch) });
+  }
+
+  function startManualWorkload(day: string) {
+    setSelectedId(null);
+    setDraft({
+      day,
+      title: "",
+      time: "17:00",
+      urgency: "medium",
+      effortHours: 3,
+    });
+    track("calendar_manual_workload_started", { day });
+  }
+
+  function saveManualWorkload(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!draft) {
+      return;
+    }
+
+    const nextDeadline: Deadline = {
+      id: `manual-${Date.now()}`,
+      title: draft.title.trim() || "Academic workload",
+      date: draft.day,
+      time: draft.time.trim() || "All day",
+      intensity: urgencyLabel[draft.urgency],
+      eventType: "academic",
+      effortHours: draft.effortHours,
+      urgency: draft.urgency,
+      confirmed: true,
+    };
+
+    setDeadlines([...deadlines, nextDeadline]);
+    setSelectedId(nextDeadline.id);
+    setDraft(null);
+    track("calendar_manual_workload_added", {
+      day: nextDeadline.date,
+      urgency: nextDeadline.urgency,
+      effort_hours: nextDeadline.effortHours,
+    });
   }
 
   return (
@@ -166,7 +217,10 @@ export function CalendarScreen({
               {deadline ? (
                 <button
                   type="button"
-                  onClick={() => setSelectedId(isSelected ? null : deadline.id)}
+                  onClick={() => {
+                    setDraft(null);
+                    setSelectedId(isSelected ? null : deadline.id);
+                  }}
                   className={cn(
                     "mt-5 w-full rounded-lg bg-white p-3 text-left shadow-sm ring-2 transition hover:shadow-md",
                     isSelected ? "ring-amber-400" : "ring-transparent hover:ring-amber-200",
@@ -181,12 +235,122 @@ export function CalendarScreen({
                   </p>
                 </button>
               ) : (
-                <p className="mt-6 text-sm text-stone-400">No academic workload detected</p>
+                <button
+                  type="button"
+                  onClick={() => startManualWorkload(day)}
+                  className={cn(
+                    "mt-5 flex min-h-32 w-full flex-col items-center justify-center rounded-lg border border-dashed p-4 text-center text-sm transition",
+                    draft?.day === day
+                      ? "border-emerald-400 bg-emerald-50 text-emerald-800"
+                      : "border-stone-300 bg-stone-50 text-stone-500 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800",
+                  )}
+                >
+                  <CalendarPlus size={22} />
+                  <span className="mt-2 font-semibold">Add workload</span>
+                  <span className="mt-1 text-xs">Deadline, exam or heavy study block</span>
+                </button>
               )}
             </div>
           );
         })}
       </div>
+
+      {draft && (
+        <form onSubmit={saveManualWorkload} className="mt-4 rounded-xl border border-emerald-200 bg-white p-6 shadow-md">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-stone-400">New academic workload</p>
+              <h2 className="mt-1 text-xl font-bold text-stone-950">{draft.day}</h2>
+              <p className="mt-1 text-sm text-stone-500">Add anything Autopilot missed so cooking effort can adapt around it.</p>
+            </div>
+            <button type="button" onClick={() => setDraft(null)} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" aria-label="Close workload form">
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_140px]">
+            <label className="block">
+              <span className="text-sm font-semibold text-stone-700">Title</span>
+              <Input
+                value={draft.title}
+                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                placeholder="e.g. Operating Systems coursework"
+                className="mt-2 h-auto rounded-lg border-stone-200 bg-white p-3"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-semibold text-stone-700">Time</span>
+              <Input
+                value={draft.time}
+                onChange={(event) => setDraft({ ...draft, time: event.target.value })}
+                placeholder="17:00"
+                className="mt-2 h-auto rounded-lg border-stone-200 bg-white p-3"
+              />
+            </label>
+          </div>
+
+          <div className="mt-5 grid gap-6 sm:grid-cols-2">
+            <div>
+              <p className="mb-2 text-sm font-semibold text-stone-700">Urgency</p>
+              <div className="flex gap-2">
+                {urgencyLevels.map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => setDraft({ ...draft, urgency: level })}
+                    className={cn(
+                      "flex-1 rounded-lg border py-2 text-sm font-medium transition",
+                      draft.urgency === level
+                        ? level === "high"
+                          ? "border-rose-400 bg-rose-50 text-rose-800"
+                          : level === "medium"
+                            ? "border-amber-400 bg-amber-50 text-amber-800"
+                            : "border-emerald-400 bg-emerald-50 text-emerald-800"
+                        : "border-stone-200 bg-white text-stone-500 hover:bg-stone-50",
+                    )}
+                  >
+                    {urgencyLabel[level]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-semibold text-stone-700">Estimated effort</p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, effortHours: Math.max(1, draft.effortHours - 1) })}
+                  disabled={draft.effortHours <= 1}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-30"
+                >
+                  <Minus size={14} />
+                </button>
+                <span className="min-w-[3.5rem] text-center text-lg font-semibold text-stone-900">
+                  {draft.effortHours}h
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, effortHours: Math.min(12, draft.effortHours + 1) })}
+                  disabled={draft.effortHours >= 12}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-30"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <AppButton type="button" variant="secondary" onClick={() => setDraft(null)} className="justify-center">
+              Cancel
+            </AppButton>
+            <AppButton type="submit" className="justify-center">
+              Save workload
+            </AppButton>
+          </div>
+        </form>
+      )}
 
       {selectedDeadline && (
         <DeadlineEditPanel

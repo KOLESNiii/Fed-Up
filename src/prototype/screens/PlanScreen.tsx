@@ -45,12 +45,6 @@ export function PlanScreen({
   const originalPlanMeal = originalDay && rescueChoice ? originalDay.meals.find((meal) => meal.slot === rescueChoice.slot) : null;
   const originalMeal = originalPlanMeal ? getMealById(originalPlanMeal.mealId, customRecipes) : null;
   const avoided = [...prefs.dislikes, ...prefs.allergens].map((value) => value.toLowerCase());
-  const replacement = seedMeals
-    .filter((meal) => rescueChoice && meal.mealSlots.includes(rescueChoice.slot))
-    .filter((meal) => meal.id !== originalPlanMeal?.mealId)
-    .filter((meal) => !meal.ingredients.some((ingredient) => avoided.includes(ingredientName(ingredient).toLowerCase())))
-    .filter((meal) => !meal.allergens.some((allergen) => avoided.includes(allergen.toLowerCase())))
-    .sort((a, b) => a.time - b.time || a.price - b.price)[0];
   const browseOptions = rescueChoice
     ? [...customRecipes, ...seedMeals.filter((m) => !customRecipes.some((c) => c.id === m.id))]
         .filter((meal) => meal.mealSlots.includes(rescueChoice.slot))
@@ -63,11 +57,17 @@ export function PlanScreen({
           return bScore - aScore || a.time - b.time || a.price - b.price;
         })
     : [];
+  const directOptions = browseOptions.slice(0, 2);
+  const replacement = directOptions[0];
   const total = plan.reduce(
     (sum, entry) => sum + entry.meals.reduce((daySum, meal) => daySum + getMealById(meal.mealId, customRecipes).price, 0),
     0,
   );
   const newTotal = originalMeal && replacement ? total - originalMeal.price + replacement.price : total;
+
+  function planTotalAfter(meal: Meal) {
+    return originalMeal ? total - originalMeal.price + meal.price : total;
+  }
 
   function closeModal() {
     setBrowseMode(false);
@@ -285,29 +285,59 @@ export function PlanScreen({
                       </p>
                     </div>
                   </div>
-                  {replacement && (
+                  {directOptions.length > 0 && (
                     <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                      <p className="text-xs font-semibold uppercase text-emerald-700">Suggested suitable option</p>
-                      <div className="mt-2 flex justify-between gap-3">
-                        <div>
-                          <p className="font-semibold">
-                            {replacement.image} {replacement.name}
-                          </p>
-                          <p className="mt-1 text-sm text-stone-600">{replacement.source}</p>
-                        </div>
-                        <p className="whitespace-nowrap text-sm">
-                          {replacement.time} min - {money(replacement.price)}
-                        </p>
+                      <p className="text-xs font-semibold uppercase text-emerald-700">Suggested suitable options</p>
+                      <div className="mt-3 space-y-3">
+                        {directOptions.map((meal, index) => {
+                          const optionTotal = planTotalAfter(meal);
+                          const optionRemaining = prefs.budget - optionTotal;
+
+                          return (
+                            <div key={meal.id} className="rounded-lg bg-white p-3 shadow-sm">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="font-semibold">
+                                      {meal.image} {meal.name}
+                                    </p>
+                                    {index === 0 && <Badge tone="green">Best fit</Badge>}
+                                  </div>
+                                  <p className="mt-1 text-sm text-stone-600">{meal.source}</p>
+                                  <p className="mt-1 text-xs text-stone-500">
+                                    {meal.time} min - {money(meal.price)} · total {money(optionTotal)} · {optionRemaining >= 0 ? `${money(optionRemaining)} left` : `${money(Math.abs(optionRemaining))} over`}
+                                  </p>
+                                </div>
+                                <AppButton className="shrink-0" onClick={() => confirmSwapWith(meal, "suggested")}>
+                                  Use
+                                </AppButton>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
                 </div>
                 {replacement && (
                   <div className="mt-5 rounded-lg bg-stone-900 p-4 text-sm text-white">
-                    <p>
-                      <strong>{Math.max(0, originalMeal.time - replacement.time)} minutes saved.</strong> Plan total after this change: {money(newTotal)}.
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <p className="text-xs uppercase text-stone-400">Current plan</p>
+                        <p className="mt-1 font-semibold">{money(total)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase text-stone-400">After best fit</p>
+                        <p className="mt-1 font-semibold">{money(newTotal)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase text-stone-400">Budget left</p>
+                        <p className="mt-1 font-semibold">{prefs.budget - newTotal >= 0 ? money(prefs.budget - newTotal) : `${money(newTotal - prefs.budget)} over`}</p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-stone-300">
+                      Best fit saves <strong className="text-white">{Math.max(0, originalMeal.time - replacement.time)} minutes</strong> compared with the original.
                     </p>
-                    <p className="mt-1 text-stone-300">{prefs.budget - newTotal >= 0 ? `${money(prefs.budget - newTotal)} remains in your weekly budget.` : `This would put the plan ${money(newTotal - prefs.budget)} over budget.`}</p>
                   </div>
                 )}
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">

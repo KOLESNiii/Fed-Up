@@ -6,6 +6,7 @@ import { mealSlots, seedMeals } from "../data";
 import type { Meal, MealSlot, PlanEntry, Preferences, Screen } from "../types";
 import { BudgetCard } from "../components/BudgetCard";
 import { AppButton, Badge } from "../components/primitives";
+import { ingredientName } from "../ingredients";
 import { getMealById, money } from "../utils";
 import { mealHealthSignals, weeklyBalanceSummary } from "../healthSignals";
 import type { TrackPrototypeEvent } from "../analytics";
@@ -46,7 +47,7 @@ export function PlanScreen({
   const replacement = seedMeals
     .filter((meal) => rescueChoice && meal.mealSlots.includes(rescueChoice.slot))
     .filter((meal) => meal.id !== originalPlanMeal?.mealId)
-    .filter((meal) => !meal.ingredients.some((ingredient) => avoided.includes(ingredient.toLowerCase())))
+    .filter((meal) => !meal.ingredients.some((ingredient) => avoided.includes(ingredientName(ingredient).toLowerCase())))
     .filter((meal) => !meal.allergens.some((allergen) => avoided.includes(allergen.toLowerCase())))
     .sort((a, b) => a.time - b.time || a.price - b.price)[0];
   const total = plan.reduce(

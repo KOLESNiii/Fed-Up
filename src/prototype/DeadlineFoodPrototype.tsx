@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePostHog } from "@posthog/react";
 
 import { capturePostHogEvent, registerPostHogContext, registerPostHogSession, type AnalyticsProperties } from "@/lib/posthog";
 import { defaultDeadlines, initialPlan, initialPreferences } from "./data";
-import type { Deadline, Meal, PlanEntry, Preferences, Screen } from "./types";
+import type { CalendarProvider, Deadline, Meal, PlanEntry, Preferences, Screen } from "./types";
 import {
   getOrCreateAnonymousSessionId,
   loadAnonymousSessionSettings,
@@ -50,18 +50,46 @@ export function DeadlineFoodPrototype() {
   const [sessionId] = useState(() => getOrCreateAnonymousSessionId());
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [screen, setScreen] = useState<Screen>(() => screenFromHash() ?? "landing");
+  const routeHistory = useRef<Screen[]>([]);
+  const pendingHashScreen = useRef<Screen | null>(null);
+  const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
   const [onboarded, setOnboarded] = useState(false);
+  const [calendarProvider, setCalendarProvider] = useState<CalendarProvider>("google");
   const [deadlines, setDeadlines] = useState<Deadline[]>(defaultDeadlines);
   const [prefs, setPrefs] = useState<Preferences>(initialPreferences);
   const [selectedSources, setSelectedSources] = useState(["budget", "bbc", "own", "campus"]);
   const [plan, setPlan] = useState<PlanEntry[]>(initialPlan);
   const [customRecipes, setCustomRecipes] = useState<Meal[]>([]);
+  const [discoverSaved, setDiscoverSaved] = useState<Meal[]>([]);
+  const [discoverRejected, setDiscoverRejected] = useState<Meal[]>([]);
   const [selectedMealId, setSelectedMealId] = useState(initialPlan[0]?.meals[0]?.mealId ?? "m1");
+  const syncPreviousScreen = useCallback(() => {
+    setPreviousScreen(routeHistory.current.at(-1) ?? null);
+  }, []);
+
   const navigateScreen = useCallback((nextScreen: Screen) => {
     if (screen === nextScreen) return;
+    routeHistory.current = [...routeHistory.current, screen].slice(-20);
+    syncPreviousScreen();
+    pendingHashScreen.current = nextScreen;
     window.location.hash = `/${nextScreen}`;
     setScreen(nextScreen);
-  }, [screen]);
+  }, [screen, syncPreviousScreen]);
+
+  const navigateBack = useCallback(() => {
+    const fallbackScreen: Screen = "dashboard";
+    const nextScreen = routeHistory.current.pop() ?? fallbackScreen;
+
+    syncPreviousScreen();
+
+    if (screen === nextScreen) {
+      return;
+    }
+
+    pendingHashScreen.current = nextScreen;
+    window.location.hash = `/${nextScreen}`;
+    setScreen(nextScreen);
+  }, [screen, syncPreviousScreen]);
 
   const track = useCallback(
     (eventName: string, properties: AnalyticsProperties = {}) => {
@@ -78,13 +106,32 @@ export function DeadlineFoodPrototype() {
     function onHashChange() {
       const nextScreen = screenFromHash();
       if (nextScreen) {
-        setScreen(nextScreen);
+        if (pendingHashScreen.current === nextScreen) {
+          pendingHashScreen.current = null;
+          setScreen(nextScreen);
+          return;
+        }
+
+        setScreen(currentScreen => {
+          if (currentScreen === nextScreen) {
+            return currentScreen;
+          }
+
+          if (routeHistory.current.at(-1) === nextScreen) {
+            routeHistory.current.pop();
+          } else {
+            routeHistory.current = [...routeHistory.current, currentScreen].slice(-20);
+          }
+
+          syncPreviousScreen();
+          return nextScreen;
+        });
       }
     }
 
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
+  }, [syncPreviousScreen]);
 
   useEffect(() => {
     registerPostHogContext(posthog, {
@@ -162,10 +209,10 @@ export function DeadlineFoodPrototype() {
   }
 
   if (screen === "landing") {
-    return <Landing onStart={() => navigateScreen(onboarded ? "dashboard" : "onboarding")} track={track} />;
+    return <Landing onStart={() => navigateScreen("onboarding")} track={track} />;
   }
 
-  if (!onboarded && screen === "onboarding") {
+  if (screen === "onboarding") {
     return (
       <Onboarding
         setOnboarded={setOnboarded}
@@ -176,19 +223,21 @@ export function DeadlineFoodPrototype() {
         setDeadlines={setDeadlines}
         selectedSources={selectedSources}
         setSelectedSources={setSelectedSources}
+        calendarProvider={calendarProvider}
+        setCalendarProvider={setCalendarProvider}
         track={track}
       />
     );
   }
 
   return (
-    <Shell screen={screen} setScreen={navigateScreen} onboarded={onboarded} track={track}>
+    <Shell screen={screen} setScreen={navigateScreen} previousScreen={previousScreen} onBack={navigateBack} onboarded={onboarded} track={track}>
       {screen === "dashboard" && <Dashboard prefs={prefs} plan={plan} customRecipes={customRecipes} setScreen={navigateScreen} onSelectMeal={openRecipe} track={track} />}
       {screen === "calendar" && <CalendarScreen deadlines={deadlines} setScreen={navigateScreen} track={track} />}
       {screen === "plan" && <PlanScreen prefs={prefs} plan={plan} setPlan={setPlan} customRecipes={customRecipes} setScreen={navigateScreen} onSelectMeal={openRecipe} track={track} />}
-      {screen === "discover" && <DiscoverScreen prefs={prefs} customRecipes={customRecipes} plan={plan} setPlan={setPlan} onSelectMeal={openRecipe} track={track} />}
+      {screen === "discover" && <DiscoverScreen prefs={prefs} customRecipes={customRecipes} plan={plan} setPlan={setPlan} saved={discoverSaved} setSaved={setDiscoverSaved} rejected={discoverRejected} setRejected={setDiscoverRejected} onSelectMeal={openRecipe} track={track} />}
       {screen === "recipes" && <RecipesScreen customRecipes={customRecipes} setCustomRecipes={setCustomRecipes} onSelectMeal={openRecipe} track={track} />}
-      {screen === "settings" && <SettingsScreen prefs={prefs} setPrefs={setPrefs} setScreen={navigateScreen} track={track} />}
+      {screen === "settings" && <SettingsScreen prefs={prefs} setPrefs={setPrefs} setScreen={navigateScreen} calendarProvider={calendarProvider} setCalendarProvider={setCalendarProvider} setDeadlines={setDeadlines} track={track} />}
       {screen === "recipe-detail" && <RecipeDetailScreen key={selectedMealId} mealId={selectedMealId} customRecipes={customRecipes} setCustomRecipes={setCustomRecipes} setScreen={navigateScreen} track={track} />}
     </Shell>
   );

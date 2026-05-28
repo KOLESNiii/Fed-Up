@@ -1,11 +1,11 @@
 import { Plus, RefreshCcw, UtensilsCrossed } from "lucide-react";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import type { Meal, NutritionSource } from "../types";
-import { AppButton, Field } from "../components/primitives";
 import { IngredientEditor } from "../components/IngredientEditor";
+import { AppButton, Field } from "../components/primitives";
 import {
   createIngredientDraft,
   formatIngredient,
@@ -19,7 +19,8 @@ import type { TrackPrototypeEvent } from "../analytics";
 type CreateForm = {
   name: string;
   minutes: number;
-  price: number;
+  totalCost: number;
+  servings: number;
   ingredients: IngredientDraft[];
   tags: string;
   allergens: string;
@@ -32,21 +33,35 @@ type CreateForm = {
   note: string;
 };
 
-const defaultForm: CreateForm = {
-  name: "",
-  minutes: 10,
-  price: 2.5,
-  ingredients: [createIngredientDraft()],
-  tags: "",
-  allergens: "",
-  calories: 500,
-  protein: 20,
-  carbs: 60,
-  fat: 15,
-  nutritionSource: undefined,
-  instructions: "",
-  note: "",
-};
+function createDefaultForm(): CreateForm {
+  return {
+    name: "",
+    minutes: 10,
+    totalCost: 5,
+    servings: 2,
+    ingredients: [createIngredientDraft()],
+    tags: "",
+    allergens: "",
+    calories: 500,
+    protein: 20,
+    carbs: 60,
+    fat: 15,
+    nutritionSource: undefined,
+    instructions: "",
+    note: "",
+  };
+}
+
+function splitList(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function positiveNumber(value: number, fallback: number) {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
 
 export function RecipesScreen({
   customRecipes,
@@ -59,14 +74,25 @@ export function RecipesScreen({
   onSelectMeal: (mealId: string) => void;
   track: TrackPrototypeEvent;
 }) {
-  const [form, setForm] = useState<CreateForm>(defaultForm);
+  const [form, setForm] = useState<CreateForm>(() => createDefaultForm());
+  const [attempted, setAttempted] = useState(false);
   const [nutritionLoading, setNutritionLoading] = useState(false);
   const [nutritionStatus, setNutritionStatus] = useState<string | null>(null);
 
-  async function estimateNutrition() {
-    const ingredients = sanitiseIngredientDrafts(form.ingredients);
+  const ingredients = sanitiseIngredientDrafts(form.ingredients);
+  const servings = positiveNumber(Number(form.servings), 1);
+  const totalCost = Math.max(0, Number(form.totalCost) || 0);
+  const costPerPortion = totalCost / servings;
+  const errors = {
+    name: !form.name.trim(),
+    ingredients: ingredients.length === 0,
+    servings: Number(form.servings) < 1,
+    totalCost: totalCost <= 0,
+  };
 
+  async function estimateNutrition() {
     if (ingredients.length === 0) {
+      setAttempted(true);
       setNutritionStatus("Add at least one ingredient with a quantity first.");
       return;
     }
@@ -99,34 +125,36 @@ export function RecipesScreen({
     }
   }
 
-  function submit(event: React.FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!form.name.trim()) return;
+    if (errors.name || errors.ingredients || errors.servings || errors.totalCost) {
+      setAttempted(true);
+      return;
+    }
 
-    const ingredients = sanitiseIngredientDrafts(form.ingredients);
-    const tags = form.tags.split(",").map((v) => v.trim()).filter(Boolean);
-    const allergens = form.allergens.split(",").map((v) => v.trim()).filter(Boolean);
     const instructions = form.instructions
       .split("\n")
-      .map((s) => s.trim())
+      .map((value) => value.trim())
       .filter(Boolean);
-
+    const nextServings = Math.max(1, Math.round(servings));
+    const nextTotalCost = Number(totalCost.toFixed(2));
+    const nextPrice = Number((nextTotalCost / nextServings).toFixed(2));
     const nextRecipe = {
       id: `custom-${Date.now()}`,
       name: form.name.trim(),
       type: "cook",
       mealSlots: ["lunch", "dinner"],
-      time: Number(form.minutes) || 0,
-      price: Number(form.price) || 0,
+      time: Math.max(0, Math.round(Number(form.minutes) || 0)),
+      price: nextPrice,
       ingredients,
-      tags,
-      allergens,
+      tags: splitList(form.tags),
+      allergens: splitList(form.allergens),
       nutrition: {
-        calories: Number(form.calories) || 0,
-        protein: Number(form.protein) || 0,
-        carbs: Number(form.carbs) || 0,
-        fat: Number(form.fat) || 0,
+        calories: Math.max(0, Math.round(Number(form.calories) || 0)),
+        protein: Math.max(0, Math.round(Number(form.protein) || 0)),
+        carbs: Math.max(0, Math.round(Number(form.carbs) || 0)),
+        fat: Math.max(0, Math.round(Number(form.fat) || 0)),
         source: form.nutritionSource,
       },
       rating: 0,
@@ -135,7 +163,7 @@ export function RecipesScreen({
         ? instructions
         : ["Prepare the ingredients.", "Cook or assemble the meal.", "Taste and adjust seasoning."],
       source: "My recipes",
-      note: form.note.trim() || "Added by you",
+      note: form.note.trim() || `${nextServings} portions from about ${money(nextTotalCost)} total`,
       image: "🍽️",
     } satisfies Meal;
 
@@ -144,10 +172,13 @@ export function RecipesScreen({
       meal_id: nextRecipe.id,
       minutes: nextRecipe.time,
       price: nextRecipe.price,
+      total_cost: nextTotalCost,
+      servings: nextServings,
       ingredient_count: nextRecipe.ingredients.length,
       tag_count: nextRecipe.tags.length,
     });
-    setForm(defaultForm);
+    setAttempted(false);
+    setForm(createDefaultForm());
     setNutritionStatus(null);
   }
 
@@ -162,12 +193,19 @@ export function RecipesScreen({
           <form onSubmit={submit}>
             <h2 className="text-xl font-bold">New recipe</h2>
             <div className="mt-5 space-y-4">
-              <Field label="Recipe name" value={form.name} onChange={(name) => setForm({ ...form, name })} placeholder="e.g. Microwave bean burrito" />
+              <Field label="Recipe name" value={form.name} onChange={(name) => setForm({ ...form, name })} placeholder="e.g. Microwave bean burrito" error={attempted && errors.name} errorMessage="Please enter a recipe name" />
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Time (mins)" type="number" value={form.minutes} onChange={(minutes) => setForm({ ...form, minutes: +minutes })} />
-                <Field label="Cost / portion (£)" type="number" step="0.05" value={form.price} onChange={(price) => setForm({ ...form, price: +price })} />
+                <Field label="Servings" type="number" value={form.servings} onChange={(servingsValue) => setForm({ ...form, servings: +servingsValue })} error={attempted && errors.servings} errorMessage="Must be at least 1" />
               </div>
-              <IngredientEditor ingredients={form.ingredients} onChange={(ingredients) => setForm({ ...form, ingredients })} />
+              <Field label="Total recipe cost (£)" type="number" step="0.05" value={form.totalCost} onChange={(cost) => setForm({ ...form, totalCost: +cost })} error={attempted && errors.totalCost} errorMessage="Please enter a cost" />
+              <p className="rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-800">
+                Estimated cost per portion: {money(costPerPortion)}
+              </p>
+              <div>
+                <IngredientEditor ingredients={form.ingredients} onChange={(nextIngredients) => setForm({ ...form, ingredients: nextIngredients })} />
+                {attempted && errors.ingredients && <p className="mt-2 text-xs font-medium text-red-600">Add at least one ingredient</p>}
+              </div>
               <Field label="Tags" value={form.tags} onChange={(tags) => setForm({ ...form, tags })} placeholder="vegetarian, microwave" />
               <Field label="Allergens" value={form.allergens} onChange={(allergens) => setForm({ ...form, allergens })} placeholder="gluten, dairy" />
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-stone-50 p-3">
@@ -189,7 +227,7 @@ export function RecipesScreen({
                 <span className="text-sm font-semibold">Method</span>
                 <Textarea
                   value={form.instructions}
-                  onChange={(e) => setForm({ ...form, instructions: e.target.value })}
+                  onChange={(event) => setForm({ ...form, instructions: event.target.value })}
                   className="mt-2 min-h-36 rounded-lg border-stone-200 bg-white"
                   placeholder={"Step 1\nStep 2\nStep 3"}
                 />

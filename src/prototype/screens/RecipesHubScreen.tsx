@@ -301,7 +301,7 @@ export function RecipesHubScreen({
       )}
 
       {tab === "add" && (
-        <div className="max-w-[480px]">
+        <div>
           <Card className="gap-0 rounded-lg border-stone-200 bg-white p-6">
             <div className="mb-5 flex items-center gap-2">
               <BookOpen size={18} className="text-emerald-700" />

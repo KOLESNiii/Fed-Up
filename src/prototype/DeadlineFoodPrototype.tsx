@@ -13,15 +13,14 @@ import { createPrototypeSessionSettings } from "./sessionPersistence";
 import { Shell } from "./components/Shell";
 import { CalendarScreen } from "./screens/CalendarScreen";
 import { Dashboard } from "./screens/Dashboard";
-import { DiscoverScreen } from "./screens/DiscoverScreen";
 import { Landing } from "./screens/Landing";
 import { Onboarding } from "./screens/Onboarding";
 import { PlanScreen } from "./screens/PlanScreen";
 import { RecipeDetailScreen } from "./screens/RecipeDetailScreen";
-import { RecipesScreen } from "./screens/RecipesScreen";
+import { RecipesHubScreen } from "./screens/RecipesHubScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 
-const screens: Screen[] = ["landing", "onboarding", "dashboard", "calendar", "plan", "discover", "recipes", "settings", "recipe-detail"];
+const screens: Screen[] = ["landing", "onboarding", "dashboard", "calendar", "plan", "recipes", "settings", "recipe-detail"];
 
 function screenFromHash(): Screen | null {
   if (typeof window === "undefined") return null;
@@ -240,8 +239,7 @@ export function DeadlineFoodPrototype() {
       {screen === "dashboard" && <Dashboard prefs={prefs} plan={plan} customRecipes={customRecipes} setScreen={navigateScreen} onSelectMeal={openRecipe} track={track} />}
       {screen === "calendar" && <CalendarScreen deadlines={deadlines} setDeadlines={setDeadlines} setScreen={navigateScreen} track={track} />}
       {screen === "plan" && <PlanScreen prefs={prefs} plan={plan} setPlan={setPlan} customRecipes={customRecipes} setScreen={navigateScreen} onSelectMeal={openRecipe} track={track} />}
-      {screen === "discover" && <DiscoverScreen prefs={prefs} customRecipes={customRecipes} plan={plan} setPlan={setPlan} saved={discoverSaved} setSaved={setDiscoverSaved} rejected={discoverRejected} setRejected={setDiscoverRejected} onSelectMeal={openRecipe} track={track} />}
-      {screen === "recipes" && <RecipesScreen customRecipes={customRecipes} setCustomRecipes={setCustomRecipes} onSelectMeal={openRecipe} track={track} />}
+      {screen === "recipes" && <RecipesHubScreen customRecipes={customRecipes} setCustomRecipes={setCustomRecipes} discoverSaved={discoverSaved} setDiscoverSaved={setDiscoverSaved} discoverRejected={discoverRejected} setDiscoverRejected={setDiscoverRejected} plan={plan} setPlan={setPlan} prefs={prefs} onSelectMeal={openRecipe} track={track} />}
       {screen === "settings" && <SettingsScreen prefs={prefs} setPrefs={setPrefs} setScreen={navigateScreen} calendarProvider={calendarProvider} setCalendarProvider={setCalendarProvider} setDeadlines={setDeadlines} track={track} />}
       {screen === "recipe-detail" && <RecipeDetailScreen key={selectedMealId} mealId={selectedMealId} customRecipes={customRecipes} setCustomRecipes={setCustomRecipes} setScreen={navigateScreen} backTo={previousScreen} track={track} />}
     </Shell>

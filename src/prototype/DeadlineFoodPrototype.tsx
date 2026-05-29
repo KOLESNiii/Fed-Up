@@ -63,6 +63,7 @@ export function DeadlineFoodPrototype() {
   const posthog = usePostHog();
   const [sessionId] = useState(() => getOrCreateAnonymousSessionId());
   const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [canPersistSession, setCanPersistSession] = useState(false);
   const [screen, setScreen] = useState<Screen>(() => screenFromHash() ?? "landing");
   const routeHistory = useRef<Screen[]>([]);
   const pendingHashScreen = useRef<Screen | null>(null);
@@ -81,14 +82,19 @@ export function DeadlineFoodPrototype() {
     setPreviousScreen(routeHistory.current.at(-1) ?? null);
   }, []);
 
+  const enableSessionPersistence = useCallback(() => {
+    setCanPersistSession(true);
+  }, []);
+
   const navigateScreen = useCallback((nextScreen: Screen) => {
     if (screen === nextScreen) return;
+    enableSessionPersistence();
     routeHistory.current = [...routeHistory.current, screen].slice(-20);
     syncPreviousScreen();
     pendingHashScreen.current = nextScreen;
     window.location.hash = `/${nextScreen}`;
     setScreen(nextScreen);
-  }, [screen, syncPreviousScreen]);
+  }, [enableSessionPersistence, screen, syncPreviousScreen]);
 
   const navigateBack = useCallback(() => {
     const fallbackScreen: Screen = "dashboard";
@@ -185,6 +191,7 @@ export function DeadlineFoodPrototype() {
           })));
           setSelectedSources(snapshot.settings.selectedSources);
           setOnboarded(snapshot.settings.onboarded);
+          setCanPersistSession(true);
           if (snapshot.settings.customRecipes) setCustomRecipes(snapshot.settings.customRecipes as Meal[]);
           if (snapshot.settings.discoverSaved) setDiscoverSaved(snapshot.settings.discoverSaved as Meal[]);
           if (snapshot.settings.discoverRejected) setDiscoverRejected(snapshot.settings.discoverRejected as Meal[]);
@@ -206,7 +213,7 @@ export function DeadlineFoodPrototype() {
   }, [sessionId]);
 
   useEffect(() => {
-    if (!sessionLoaded) return;
+    if (!sessionLoaded || !canPersistSession) return;
 
     const timeout = window.setTimeout(() => {
       saveAnonymousSessionSettings(
@@ -227,16 +234,25 @@ export function DeadlineFoodPrototype() {
     }, 600);
 
     return () => window.clearTimeout(timeout);
-  }, [customRecipes, deadlines, discoverRejected, discoverSaved, onboarded, plan, prefs, selectedSources, sessionId, sessionLoaded]);
+  }, [canPersistSession, customRecipes, deadlines, discoverRejected, discoverSaved, onboarded, plan, prefs, selectedSources, sessionId, sessionLoaded]);
 
   useEffect(() => {
-    if (!sessionLoaded || onboarded || !isAppScreen(screen)) {
+    if (!sessionLoaded) {
       return;
     }
 
-    routeHistory.current = [];
-    pendingHashScreen.current = "landing";
-    window.location.hash = "/landing";
+    if (onboarded && onboardingScreens.has(screen)) {
+      routeHistory.current = [];
+      pendingHashScreen.current = "dashboard";
+      window.location.hash = "/dashboard";
+      return;
+    }
+
+    if (!onboarded && isAppScreen(screen)) {
+      routeHistory.current = [];
+      pendingHashScreen.current = "landing";
+      window.location.hash = "/landing";
+    }
   }, [onboarded, screen, sessionLoaded]);
 
   function openRecipe(mealId: string) {
@@ -245,14 +261,24 @@ export function DeadlineFoodPrototype() {
     navigateScreen("recipe-detail");
   }
 
+  if (!sessionLoaded || (onboarded && onboardingScreens.has(screen)) || (!onboarded && isAppScreen(screen))) {
+    return <LoadingScreen />;
+  }
+
   if (screen === "landing") {
-    return <Landing onStart={() => navigateScreen("onboarding")} track={track} />;
+    return <Landing onStart={() => {
+      enableSessionPersistence();
+      navigateScreen("onboarding");
+    }} track={track} />;
   }
 
   if (screen === "onboarding") {
     return (
       <Onboarding
-        setOnboarded={setOnboarded}
+        setOnboarded={(nextOnboarded) => {
+          enableSessionPersistence();
+          setOnboarded(nextOnboarded);
+        }}
         setScreen={navigateScreen}
         prefs={prefs}
         setPrefs={setPrefs}
@@ -265,10 +291,6 @@ export function DeadlineFoodPrototype() {
         track={track}
       />
     );
-  }
-
-  if (!sessionLoaded || (!onboarded && isAppScreen(screen))) {
-    return <LoadingScreen />;
   }
 
   return (

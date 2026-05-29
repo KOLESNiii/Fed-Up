@@ -9,7 +9,7 @@ import {
   loadAnonymousSessionSettings,
   saveAnonymousSessionSettings,
 } from "./anonymousSessionApi";
-import { createPrototypeSessionSettings } from "./sessionPersistence";
+import { createPrototypeSessionSettings, restorePrototypePlan } from "./sessionPersistence";
 import { Shell } from "./components/Shell";
 import { CalendarScreen } from "./screens/CalendarScreen";
 import { Dashboard } from "./screens/Dashboard";
@@ -21,12 +21,27 @@ import { RecipesHubScreen } from "./screens/RecipesHubScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 
 const screens: Screen[] = ["landing", "onboarding", "dashboard", "calendar", "plan", "recipes", "settings", "recipe-detail"];
+const onboardingScreens = new Set<Screen>(["landing", "onboarding"]);
 
 function screenFromHash(): Screen | null {
   if (typeof window === "undefined") return null;
 
   const value = window.location.hash.replace("#/", "") as Screen;
   return screens.includes(value) ? value : null;
+}
+
+function isAppScreen(screen: Screen): boolean {
+  return !onboardingScreens.has(screen);
+}
+
+function LoadingScreen() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-[#faf9f5] px-5 text-stone-900">
+      <div className="rounded-lg border border-stone-200 bg-white px-6 py-5 text-stone-700 shadow-sm">
+        Loading your meal plan...
+      </div>
+    </main>
+  );
 }
 
 function budgetBand(budget: number): string {
@@ -173,7 +188,7 @@ export function DeadlineFoodPrototype() {
           if (snapshot.settings.customRecipes) setCustomRecipes(snapshot.settings.customRecipes as Meal[]);
           if (snapshot.settings.discoverSaved) setDiscoverSaved(snapshot.settings.discoverSaved as Meal[]);
           if (snapshot.settings.discoverRejected) setDiscoverRejected(snapshot.settings.discoverRejected as Meal[]);
-          if (snapshot.settings.plan) setPlan(snapshot.settings.plan as PlanEntry[]);
+          setPlan(restorePrototypePlan(snapshot.settings.plan, initialPlan));
         }
 
         setSessionLoaded(true);
@@ -214,6 +229,16 @@ export function DeadlineFoodPrototype() {
     return () => window.clearTimeout(timeout);
   }, [customRecipes, deadlines, discoverRejected, discoverSaved, onboarded, plan, prefs, selectedSources, sessionId, sessionLoaded]);
 
+  useEffect(() => {
+    if (!sessionLoaded || onboarded || !isAppScreen(screen)) {
+      return;
+    }
+
+    routeHistory.current = [];
+    pendingHashScreen.current = "landing";
+    window.location.hash = "/landing";
+  }, [onboarded, screen, sessionLoaded]);
+
   function openRecipe(mealId: string) {
     track("recipe_viewed", { meal_id: mealId, source_screen: screen });
     setSelectedMealId(mealId);
@@ -240,6 +265,10 @@ export function DeadlineFoodPrototype() {
         track={track}
       />
     );
+  }
+
+  if (!sessionLoaded || (!onboarded && isAppScreen(screen))) {
+    return <LoadingScreen />;
   }
 
   return (

@@ -122,3 +122,41 @@ test("landing CTA reopens constraint setup for returning users", async ({ page }
   await expect(page.getByRole("heading", { name: /connect your calendar/i })).toBeVisible();
   await expect(page.getByRole("heading", { name: /your week is covered/i })).toHaveCount(0);
 });
+
+test("direct app deep link without a session returns to landing instead of orphaning the shell", async ({ page }) => {
+  await page.goto("/#/plan");
+
+  await expect(page.getByRole("heading", { name: /healthy meals that fit around coursework/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /planned meals/i })).toHaveCount(0);
+  await expect(page.locator("header")).toHaveCount(0);
+});
+
+test("direct plan refresh restores nav and seeded timetable for returning users with empty persisted plan", async ({ page }) => {
+  const sessionId = "empty-plan-session-39";
+
+  await page.request.put("/api/deadline-food/session", {
+    data: {
+      sessionId,
+      settings: createPrototypeSessionSettings({
+        preferences: initialPreferences,
+        deadlines: defaultDeadlines,
+        selectedSources: ["budget", "bbc", "own", "campus"],
+        onboarded: true,
+        plan: [],
+      }),
+    },
+  });
+
+  await page.addInitScript(
+    ({ key, value }) => {
+      window.localStorage.setItem(key, value);
+    },
+    { key: ANONYMOUS_SESSION_STORAGE_KEY, value: sessionId },
+  );
+
+  await page.goto("/#/plan");
+
+  await expect(page.getByRole("heading", { name: /planned meals/i })).toBeVisible();
+  await expect(page.locator("header")).toBeVisible();
+  await expect(page.getByRole("button", { name: /overnight oat jar/i }).first()).toBeVisible();
+});

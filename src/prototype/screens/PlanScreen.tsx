@@ -1,12 +1,14 @@
-import { ArrowLeft, Clock3, Heart, RefreshCcw, X } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, Clock3, Heart, RefreshCcw, ShoppingBasket, X } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { Card } from "@/components/ui/card";
 import { mealSlots, seedMeals } from "../data";
 import type { Meal, MealSlot, PlanEntry, Preferences, Screen } from "../types";
 import { BudgetCard } from "../components/BudgetCard";
+import { ShoppingListCard } from "../components/ShoppingListCard";
 import { AppButton, Badge } from "../components/primitives";
 import { ingredientName } from "../ingredients";
+import { groceryVendorById, groceryVendors, ingredientsFromPlan } from "../shopping";
 import { getMealById, money } from "../utils";
 import { mealHealthSignals, weeklyBalanceSummary } from "../healthSignals";
 import type { TrackPrototypeEvent } from "../analytics";
@@ -21,6 +23,14 @@ const slotLabels: Record<MealSlot, string> = {
   lunch: "Lunch",
   dinner: "Dinner",
 };
+
+function priceDiff(newPrice: number, oldPrice: number) {
+  const diff = newPrice - oldPrice;
+  if (Math.abs(diff) < 0.005) return { label: "same price", sign: "neutral" as const };
+  return diff < 0
+    ? { label: `saves ${money(Math.abs(diff))}`, sign: "saving" as const }
+    : { label: `costs ${money(diff)} more`, sign: "extra" as const };
+}
 
 export function PlanScreen({
   plan,
@@ -41,6 +51,9 @@ export function PlanScreen({
 }) {
   const [rescueChoice, setRescueChoice] = useState<RescueChoice>(null);
   const [browseMode, setBrowseMode] = useState(false);
+  const [shoppingOpen, setShoppingOpen] = useState(false);
+  const [shoppingVendorId, setShoppingVendorId] = useState(groceryVendors[0].id);
+  const shoppingItems = useMemo(() => ingredientsFromPlan(plan, customRecipes), [plan, customRecipes]);
   const originalDay = rescueChoice ? plan.find((entry) => entry.day === rescueChoice.day) : null;
   const originalPlanMeal = originalDay && rescueChoice ? originalDay.meals.find((meal) => meal.slot === rescueChoice.slot) : null;
   const originalMeal = originalPlanMeal ? getMealById(originalPlanMeal.mealId, customRecipes) : null;
@@ -218,8 +231,60 @@ export function PlanScreen({
             <p className="font-semibold">Weekly balance</p>
             <p className="mt-2 text-sm text-stone-500">{weeklyBalanceSummary(plan, customRecipes)} Signals are broad checks, not calorie targets.</p>
           </Card>
+          <Card className="gap-0 rounded-lg border-stone-200 bg-white p-4">
+            <div className="flex items-center gap-3">
+              <span className="rounded-lg bg-emerald-50 p-2 text-emerald-700">
+                <ShoppingBasket size={18} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold">Shopping list</p>
+                <p className="mt-0.5 text-sm text-stone-500">
+                  {shoppingItems.length === 0 ? "No items yet" : `${shoppingItems.length} items this week`}
+                </p>
+              </div>
+              <AppButton
+                type="button"
+                variant="secondary"
+                className="shrink-0 px-3 py-1.5 text-xs"
+                onClick={() => setShoppingOpen(true)}
+                disabled={shoppingItems.length === 0}
+              >
+                View list
+              </AppButton>
+            </div>
+          </Card>
         </div>
       </div>
+      {shoppingOpen && (
+        <>
+          <div className="fixed inset-0 z-40 bg-stone-950/40" onClick={() => setShoppingOpen(false)} />
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl sm:max-w-md">
+            <div className="flex items-center justify-between border-b border-stone-200 px-5 py-4">
+              <h2 className="font-bold">Shopping list</h2>
+              <button type="button" onClick={() => setShoppingOpen(false)} aria-label="Close shopping list" className="rounded-lg p-2 hover:bg-stone-100">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              <ShoppingListCard
+                title="Shopping list"
+                description="All ingredients across your planned meals for the week."
+                items={shoppingItems}
+                selectedVendor={groceryVendorById(shoppingVendorId)}
+                vendors={groceryVendors}
+                onSelectVendor={setShoppingVendorId}
+                onOpenIngredient={(ingredient) => {
+                  track("vendor_shopping_item_opened", { ingredient, vendor: shoppingVendorId, source: "plan" });
+                  window.open(groceryVendorById(shoppingVendorId).searchUrl(ingredient), "_blank", "noopener");
+                }}
+                onCopy={() => track("vendor_shopping_list_copied", { vendor: shoppingVendorId, item_count: shoppingItems.length, source: "plan" })}
+                onToggleItem={(ingredient, checked, checkedCount, itemCount) => track("vendor_shopping_item_toggled", { ingredient, checked, checked_count: checkedCount, item_count: itemCount, source: "plan" })}
+                storageKey="deadline-food:plan-shopping-list"
+              />
+            </div>
+          </div>
+        </>
+      )}
       {rescueChoice && originalMeal && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-stone-950/40 p-0 sm:items-center sm:p-5">
           <Card className="w-full max-w-lg gap-0 overflow-y-auto rounded-t-lg bg-white p-6 shadow-2xl max-h-[90dvh] sm:rounded-lg">
@@ -242,7 +307,7 @@ export function PlanScreen({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="font-semibold">{meal.image} {meal.name}</p>
-                            <p className="mt-1 text-sm text-stone-500">{meal.source} · {meal.time} min · {money(meal.price)}</p>
+                            <p className="mt-1 text-sm text-stone-500">{meal.source} · {meal.time} min · {money(meal.price)} · {priceDiff(meal.price, originalMeal?.price ?? 0).label}</p>
                           </div>
                           <AppButton className="shrink-0" onClick={() => { track("meal_swap_browse_option_selected", { day: rescueChoice.day, meal_slot: rescueChoice.slot, meal_id: meal.id }); confirmSwapWith(meal, "browse"); }}>
                             Use
@@ -305,7 +370,7 @@ export function PlanScreen({
                                   </div>
                                   <p className="mt-1 text-sm text-stone-600">{meal.source}</p>
                                   <p className="mt-1 text-xs text-stone-500">
-                                    {meal.time} min - {money(meal.price)} · total {money(optionTotal)} · {optionRemaining >= 0 ? `${money(optionRemaining)} left` : `${money(Math.abs(optionRemaining))} over`}
+                                    {meal.time} min - {money(meal.price)} · {priceDiff(meal.price, originalMeal.price).label} · total {money(optionTotal)} · {optionRemaining >= 0 ? `${money(optionRemaining)} left` : `${money(Math.abs(optionRemaining))} over`}
                                   </p>
                                 </div>
                                 <AppButton className="shrink-0" onClick={() => confirmSwapWith(meal, "suggested")}>
@@ -343,6 +408,17 @@ export function PlanScreen({
                       ) : (
                         <>Best fit takes the same time as the original.</>
                       )}
+                      {" "}
+                      {(() => {
+                        const diff = priceDiff(replacement.price, originalMeal.price);
+                        return diff.sign === "saving" ? (
+                          <>You've <strong className="text-white">saved {money(Math.abs(replacement.price - originalMeal.price))}</strong> on this meal.</>
+                        ) : diff.sign === "extra" ? (
+                          <>You've <strong className="text-white">spent {money(replacement.price - originalMeal.price)} more</strong> on this meal.</>
+                        ) : (
+                          <>This meal costs the same.</>
+                        );
+                      })()}
                     </p>
                   </div>
                 )}

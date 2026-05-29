@@ -170,6 +170,10 @@ export function DeadlineFoodPrototype() {
           })));
           setSelectedSources(snapshot.settings.selectedSources);
           setOnboarded(snapshot.settings.onboarded);
+          if (snapshot.settings.customRecipes) setCustomRecipes(snapshot.settings.customRecipes as Meal[]);
+          if (snapshot.settings.discoverSaved) setDiscoverSaved(snapshot.settings.discoverSaved as Meal[]);
+          if (snapshot.settings.discoverRejected) setDiscoverRejected(snapshot.settings.discoverRejected as Meal[]);
+          if (snapshot.settings.plan) setPlan(snapshot.settings.plan as PlanEntry[]);
         }
 
         setSessionLoaded(true);
@@ -197,6 +201,10 @@ export function DeadlineFoodPrototype() {
           deadlines,
           selectedSources,
           onboarded,
+          customRecipes,
+          discoverSaved,
+          discoverRejected,
+          plan,
         }),
       ).catch(error => {
         console.warn("Anonymous session settings could not be saved.", error);
@@ -204,7 +212,7 @@ export function DeadlineFoodPrototype() {
     }, 600);
 
     return () => window.clearTimeout(timeout);
-  }, [deadlines, onboarded, prefs, selectedSources, sessionId, sessionLoaded]);
+  }, [customRecipes, deadlines, discoverRejected, discoverSaved, onboarded, plan, prefs, selectedSources, sessionId, sessionLoaded]);
 
   function openRecipe(mealId: string) {
     track("recipe_viewed", { meal_id: mealId, source_screen: screen });

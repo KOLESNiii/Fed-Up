@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { allergens, calendarProviders, cookingAbilities, dietary, dislikes, likes } from "../data";
 import type { CalendarEvent, CalendarProvider, Deadline, Preferences, Screen } from "../types";
-import { AppButton, ChoiceGroup, Field, SelectField } from "../components/primitives";
+import { AppButton, ChoiceGroup, SelectField } from "../components/primitives";
 import { formatCookingLimit } from "../utils";
 import { IngredientEditor } from "../components/IngredientEditor";
 import { ingredientDraftsFromIngredients, sanitiseIngredientDrafts, type IngredientDraft } from "../ingredients";

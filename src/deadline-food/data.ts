@@ -371,8 +371,6 @@ export const initialPreferences: Preferences = {
   budget: 48,
   kitchen: "",
   cookingAbility: "",
-  postcode: "",
-  university: "",
   dietary: [],
   allergens: [],
   dislikes: [],

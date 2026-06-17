@@ -139,8 +139,6 @@ export async function syncRecommenderUser(sessionId: string, prefs: Preferences,
       allergens: normalizeRecommenderTags(prefs.allergens),
       dislikes: normalizeRecommenderTags(prefs.dislikes),
       likes: normalizeRecommenderTags(prefs.likes),
-      university: prefs.university || null,
-      postcode: prefs.postcode || null,
     }),
     signal,
   });
@@ -148,9 +146,9 @@ export async function syncRecommenderUser(sessionId: string, prefs: Preferences,
   await readJson(response, "Recommender user sync");
 }
 
-// Publishing, unpublishing and deleting a recipe are account-owned actions, so
-// every mutation carries the caller's Firebase ID token (#213 follow-up). The
-// backend rejects anonymous callers and enforces ownership.
+// Publishing, unpublishing and deleting a recipe carry the caller's Firebase ID
+// token (#213 follow-up). The backend accepts anonymous Firebase tokens and
+// enforces ownership by UID.
 async function authHeaders(): Promise<Record<string, string>> {
   const token = await getDeadlineFoodAuthToken().catch(() => null);
   return token ? { authorization: `Bearer ${token}` } : {};

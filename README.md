@@ -1,84 +1,91 @@
-# bun-react-tailwind-shadcn-template
+# Fed Up
 
-To install dependencies:
+> A human-centred meal-planning web app that helps students eat well when coursework takes over.
 
-```bash
-bun install
-```
+![Fed Up overview](docs/readme-assets/fed-up-overview.png)
 
-To start a development server:
+Fed Up was created as part of a **university group project** by Team DRP03. It is designed for deadline-driven students who understand the value of healthy food but struggle with time, energy, budget, shared-kitchen constraints and decision fatigue.
 
-```bash
-bun dev
-```
+The central idea is simple: make the next realistic meal easier to choose, adapt and cook—without treating a broken plan or ready-meal fallback as failure.
 
-To run for production:
+## What it does
 
-```bash
-bun start
-```
+- Collects a student's preferences, dietary requirements, budget, cooking capacity and workload.
+- Generates a practical meal plan around the week the student actually has.
+- Lets users quickly change meals when plans shift.
+- Supports recipe discovery, saving, personal recipes and community sharing controls.
+- Builds shopping lists from planned recipes.
+- Connects meal planning to calendar and workload context.
+- Uses recipe images, clear tags and visible trust states such as verified and community recipes.
 
-To run the local pre-commit verification suite:
+## Product walkthrough
 
-```bash
-bun run verify
-```
+### 1. Onboarding around real constraints
 
-This runs root lint/typecheck/unit/domain tests, Firebase data generation, functions lint/build, app build, audit, and Playwright e2e tests. If the e2e step reports a missing browser executable, run `bunx playwright install chromium` once and rerun `bun run verify`.
+The onboarding flow turns vague goals into useful inputs: time, budget, dietary needs, cooking preferences and workload.
 
-## Anonymous session storage
+![Fed Up onboarding flow](docs/readme-assets/onboarding-flow.png)
 
-The app persists user settings with anonymous no-sign-in sessions. The
-browser stores only an opaque session ID; settings are saved through the backend
-to Firestore in `anonymousSessions/{sessionId}`. Stale anonymous records are
-handled with a 90-day `expiresAt` field that should be managed by Firestore TTL.
+### 2. A plan that can adapt
 
-See [docs/anonymous-session-storage.md](docs/anonymous-session-storage.md) for
-the data model, API contract, retention policy, local emulator flow, and
-migration path.
+The dashboard gives students an immediate next action and makes swapping a normal part of following the plan.
 
-## Firebase CI deploy setup
+![Fed Up meal plan](docs/readme-assets/meal-plan.png)
 
-GitLab deploys Firebase with these CI/CD variables:
+### 3. Recipes and discovery
 
-```bash
-FIREBASE_PROJECT_ID=your-firebase-project-id
-FIREBASE_SERVICE_ACCOUNT_KEY_B64=base64-encoded-service-account-json
-```
+Recipe discovery is designed for both organised meal-preppers and users who choose food more spontaneously. Recipes can be browsed, saved, adapted and used to build a shopping list.
 
-The service account must be able to run Firebase CLI deploys for functions and Firestore rules/indexes. At minimum, grant it Firebase access, Cloud Functions deploy access, and permission to read/enable project APIs:
+![Fed Up recipe discovery](docs/readme-assets/recipe-discovery.png)
 
-```bash
-PROJECT_ID=your-firebase-project-id
-SERVICE_ACCOUNT=your-ci-service-account@${PROJECT_ID}.iam.gserviceaccount.com
+Calendar context and shopping support extend the experience beyond a single screen, helping the plan fit into everyday student routines.
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${SERVICE_ACCOUNT}" \
-  --role="roles/firebase.admin"
+![Fed Up calendar support](docs/readme-assets/calendar-support.png)
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${SERVICE_ACCOUNT}" \
-  --role="roles/cloudfunctions.admin"
+## Human-centred design process
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${SERVICE_ACCOUNT}" \
-  --role="roles/iam.serviceAccountUser"
+The project used an iterative research and testing process rather than assuming that students simply needed more nutritional information:
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${SERVICE_ACCOUNT}" \
-  --role="roles/firebaserules.admin"
+- 8 semi-structured interviews with 10 interviewees.
+- A cleaned survey dataset of 72 responses.
+- Persona, stakeholder mapping, AEIOU field research and journey mapping.
+- Paper prototypes, digital mockups and a deployed walking skeleton.
+- Think-aloud usability sessions supported by PostHog behavioural analytics.
+- Approximately 130 improvements captured through GitLab issues and merge requests.
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${SERVICE_ACCOUNT}" \
-  --role="roles/artifactregistry.admin"
+Research showed that academic pressure, time scarcity and tiredness were stronger barriers than lack of cooking knowledge. This shifted the product towards reducing friction: clearer click targets, faster meal changes, realistic fallbacks, visible recipe states and simpler calendar interactions.
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${SERVICE_ACCOUNT}" \
-  --role="roles/serviceusage.serviceUsageAdmin"
-```
+## Technical overview
 
-`roles/serviceusage.serviceUsageAdmin` is needed when Firebase CLI checks or enables APIs such as Firestore, Cloud Functions, Cloud Build, Artifact Registry, and Cloud Run. If all required APIs are already enabled, `roles/serviceusage.serviceUsageViewer` may be enough for the API check, but admin is the least painful setup for first deploys.
-`roles/firebaserules.admin` is needed to validate and deploy `firestore.rules`.
-`roles/artifactregistry.admin` is needed to create or update the cleanup policy for Cloud Run function container images.
+The prototype uses a modern full-stack architecture:
 
-This project was created using `bun init` in bun v1.3.2. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+- **Frontend:** React, TypeScript, Tailwind CSS and shadcn/ui
+- **Backend:** Node.js 24 Cloud Functions, Firebase Authentication and Firestore
+- **Recipe intelligence:** FastAPI, PostgreSQL with pgvector and Sentence Transformers
+- **Data sources:** USDA and OpenFoodFacts, with cached facts where appropriate
+- **Delivery and tooling:** Bun, Docker, GitLab CI, Vercel, Playwright and PostHog
+
+![Fed Up system architecture](docs/readme-assets/architecture.png)
+
+## What I learned
+
+Fed Up was a practical university project combining software engineering with product discovery. The strongest lesson was that small interaction details matter when users are tired or under pressure: a non-clickable card, unclear label or hidden state can be enough to break the experience. Combining qualitative feedback with behavioural analytics helped the team identify both what users said and what they actually struggled to do.
+
+## Team contributions
+
+This project was developed collaboratively with:
+
+- [@bananadado](https://github.com/bananadado)
+- [@dorianturner](https://github.com/dorianturner)
+- [@lucashutton](https://github.com/lucashutton)
+
+The team contributed across research, human-centred design, prototyping, frontend and backend development, testing, analytics and project delivery.
+
+## Further reading
+
+- [Final presentation slides](final_presentation_slides.pdf)
+- [Human-centred design techniques portfolio](hcd_techniques_portfolio.pdf)
+
+## Status
+
+Fed Up is a university group project and working prototype. Future directions identified by the team include more intelligent meal-plan suggestions, a stronger recipe community and app-store delivery.

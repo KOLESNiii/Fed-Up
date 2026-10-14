@@ -44,7 +44,6 @@
     "posthog-js": "^1.376.2",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router": "^7.15.1",
     "root": "^3.2.0",
     "tailwind-merge": "^3.6.0"
   },
